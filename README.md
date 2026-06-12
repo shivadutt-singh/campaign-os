@@ -55,4 +55,19 @@
 ### 1. Clone the repository
 ```bash
 git clone [https://github.com/shivadutt-singh/campaign-os.git](https://github.com/shivadutt-singh/campaign-os.git)
+
+
 cd campaign-os
+```bash
+npm install
+```
+### 1. Run the Development Server
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
