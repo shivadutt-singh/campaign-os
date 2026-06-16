@@ -2,6 +2,8 @@
 
 import { motion } from "framer-motion";
 import { Sparkles, Rocket, Code2, TerminalSquare } from "lucide-react";
+import BudgetSimulatorCard from "@/components/budgetsimulatorcard";
+import ProbabilisticChart from "@/components/probabilisticchart";
 
 export default function Home() {
   return (
@@ -75,6 +77,15 @@ export default function Home() {
             </div>
           </div>
         </motion.div>
+
+        <div className="w-full max-w-4xl mt-10">
+          <BudgetSimulatorCard />
+
+            <div className="mt-8 w-full">
+              <ProbabilisticChart />
+            </div>
+        </div>
+
 
         {/* Action Button */}
         <motion.div
