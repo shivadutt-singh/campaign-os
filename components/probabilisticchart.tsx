@@ -1,7 +1,8 @@
 "use client";
 
 import {
-  LineChart,
+  ComposedChart,
+  Area,
   Line,
   XAxis,
   YAxis,
@@ -29,12 +30,20 @@ export default function ProbabilisticChart() {
 
       <div className="w-full h-[300px] min-w-0">
         <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={data}>
+          <ComposedChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
              <XAxis dataKey="month" />
              <YAxis />
              <Tooltip />
              <Legend />
+
+            <Area
+                type="monotone"
+                dataKey="best"
+                stroke="none"
+                fill="#333333"
+                fillOpacity={0.25}
+            />
 
              <Line
                 type="monotone"
@@ -56,7 +65,7 @@ export default function ProbabilisticChart() {
                 stroke="#EF4444"
                 strokeWidth={3}
              />
-          </LineChart>
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
     </div>

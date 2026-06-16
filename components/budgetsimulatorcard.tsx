@@ -2,10 +2,22 @@
 
 import { useState } from "react";
 
-export default function BudgetSimulatorCard() {
+export default function BudgetSimulatorCard({
+  setIsLoading,
+}: {
+  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}) {
   const [budget, setBudget] = useState(50000);
   const [duration, setDuration] = useState(6);
   const [growth, setGrowth] = useState(15);
+
+  const handleSliderRelease = () => {
+  setIsLoading(true);
+
+  setTimeout(() => {
+    setIsLoading(false);
+  }, 2000);
+};
 
   return (
     <div className="bg-[#111111] border border-[#333333] rounded-xl p-6 text-white">
@@ -21,6 +33,7 @@ export default function BudgetSimulatorCard() {
           max="100000"
           value={budget}
           onChange={(e) => setBudget(Number(e.target.value))}
+          onMouseUp={handleSliderRelease}
           className="w-full"
         />
       </div>
@@ -33,6 +46,7 @@ export default function BudgetSimulatorCard() {
           max="12"
           value={duration}
           onChange={(e) => setDuration(Number(e.target.value))}
+          onMouseUp={handleSliderRelease}
           className="w-full"
         />
       </div>
@@ -45,6 +59,7 @@ export default function BudgetSimulatorCard() {
           max="50"
           value={growth}
           onChange={(e) => setGrowth(Number(e.target.value))}
+          onMouseUp={handleSliderRelease}
           className="w-full"
         />
       </div>

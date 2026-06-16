@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, Rocket, Code2, TerminalSquare } from "lucide-react";
 import BudgetSimulatorCard from "@/components/budgetsimulatorcard";
 import ProbabilisticChart from "@/components/probabilisticchart";
 
 export default function Home() {
+  const [isLoading, setIsLoading] = useState(false);
   return (
     <main className="min-h-screen bg-[#0A0A0A] text-zinc-50 flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
       {/* Subtle Background Glows */}
@@ -79,10 +81,10 @@ export default function Home() {
         </motion.div>
 
         <div className="w-full max-w-4xl mt-10">
-          <BudgetSimulatorCard />
+          <BudgetSimulatorCard setIsLoading={setIsLoading} />
 
             <div className="mt-8 w-full">
-              <ProbabilisticChart />
+              <ProbabilisticChart/>
             </div>
         </div>
 
