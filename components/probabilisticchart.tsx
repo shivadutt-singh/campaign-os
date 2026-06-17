@@ -37,14 +37,14 @@ export default function ProbabilisticChart() {
              <Tooltip />
              <Legend />
 
-            <Area
-                type="monotone"
-                dataKey="best"
-                stroke="none"
-                fill="#333333"
-                fillOpacity={0.25}
-            />
-
+             <Area
+              type="monotone"
+              dataKey="best"
+              stroke="none"
+              fill="#333333"
+              fillOpacity={0.25}
+              legendType="none"
+             />
              <Line
                 type="monotone"
                 dataKey="best"
