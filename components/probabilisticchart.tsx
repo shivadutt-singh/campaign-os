@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { div } from "framer-motion/client";
+import React from "react";
 import {
   ComposedChart,
   Area,
@@ -51,21 +52,35 @@ export default function ProbabilisticChart({
              <XAxis dataKey="month" />
              <YAxis />
              <Tooltip
-              formatter={(value, name) => {
-              if (name === "") return null;
-              return [value, name];
-              }}
+                content={({ active, payload }) => {
+                  if (!active || !payload) return null;
+
+                 const filtered = payload.filter(
+                    (item) => item.name !== "Risk Range"
+                  );
+
+                  return (
+                    <div className="bg-[#111111] border border-[#333333] p-3 rounded">
+                      {filtered.map((item, index) => (
+                        <p key={index}>
+                          {item.name}: {item.value}
+                        </p>
+                      ))}
+                    </div>
+                  );
+                }}
               />
+
              <Legend />
 
              <Area
-              type="monotone"
-              dataKey="best"
-              name="Risk Range"
-              stroke="none"
-              fill="#333333"
-              fillOpacity={0.25}
-              legendType="none"
+                type="monotone"
+                dataKey="best"
+                name="Risk Range"
+                stroke="none"
+                fill="#333333"
+                fillOpacity={0.25}
+                legendType="none"
               />
 
              <Line
@@ -73,24 +88,24 @@ export default function ProbabilisticChart({
                 dataKey="best"
                 stroke="#22C55E"
                 strokeWidth={3}
-             />
+              />
 
              <Line
                 type="monotone"
                 dataKey="expected"
                 stroke="#3B82F6"
                 strokeWidth={3}
-             />
+              />
 
              <Line
                 type="monotone"
                 dataKey="worst"
                 stroke="#EF4444"
                 strokeWidth={3}
-             />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+              />
+            </ComposedChart>
+         </ResponsiveContainer>
+        </div>
+     </div>
   );
 }
