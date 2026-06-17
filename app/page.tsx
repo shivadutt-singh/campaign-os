@@ -84,7 +84,7 @@ export default function Home() {
           <BudgetSimulatorCard setIsLoading={setIsLoading} />
 
             <div className="mt-8 w-full">
-              <ProbabilisticChart/>
+              <ProbabilisticChart isLoading={isLoading} />
             </div>
         </div>
 

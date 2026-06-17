@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   ComposedChart,
   Area,
@@ -21,7 +22,22 @@ const data = [
   { month: "Jun", best: 56000, expected: 47000, worst: 40000 },
 ];
 
-export default function ProbabilisticChart() {
+export default function ProbabilisticChart({
+  isLoading,
+}: {
+  isLoading: boolean;
+}) {
+  
+  if (isLoading) {
+    return (
+      <div className="bg-[#111111] border border-[#333333] rounded-xl p-6">
+        <div className="h-8 w-56 bg-zinc-700 rounded animate-pulse mb-6"></div>
+
+        <div className="h-[300px] w-full bg-zinc-800 rounded-lg animate-pulse"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[#111111] border border-[#333333] rounded-xl p-6 text-white">
       <h2 className="text-2xl font-bold mb-6">
@@ -34,17 +50,24 @@ export default function ProbabilisticChart() {
             <CartesianGrid strokeDasharray="3 3" />
              <XAxis dataKey="month" />
              <YAxis />
-             <Tooltip />
+             <Tooltip
+              formatter={(value, name) => {
+              if (name === "") return null;
+              return [value, name];
+              }}
+              />
              <Legend />
 
              <Area
               type="monotone"
               dataKey="best"
+              name="Risk Range"
               stroke="none"
               fill="#333333"
               fillOpacity={0.25}
               legendType="none"
-             />
+              />
+
              <Line
                 type="monotone"
                 dataKey="best"
