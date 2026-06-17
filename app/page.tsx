@@ -2,12 +2,16 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Rocket, Code2, TerminalSquare } from "lucide-react";
+import { Sparkles, Rocket, TerminalSquare } from "lucide-react";
 import BudgetSimulatorCard from "@/components/budgetsimulatorcard";
 import ProbabilisticChart from "@/components/probabilisticchart";
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
+  const [budget, setBudget] = useState(50000);
+  const [duration, setDuration] = useState(6);
+  const [growth, setGrowth] = useState(15);
+
   return (
     <main className="min-h-screen bg-[#0A0A0A] text-zinc-50 flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
       {/* Subtle Background Glows */}
@@ -58,7 +62,7 @@ export default function Home() {
             </div>
 
             <blockquote className="text-xl md:text-2xl font-semibold text-zinc-200 mb-6 italic leading-relaxed">
-              "We are not just writing code; we are engineering the future of digital marketing. Let's make every commit count."
+              &quot;We are not just writing code; we are engineering the future of digital marketing. Let&apos;s make every commit count.&quot;
             </blockquote>
 
             <div className="flex flex-col items-center gap-4 border-t border-white/10 pt-6 mt-2">
@@ -81,10 +85,23 @@ export default function Home() {
         </motion.div>
 
         <div className="w-full max-w-4xl mt-10">
-          <BudgetSimulatorCard setIsLoading={setIsLoading} />
+          <BudgetSimulatorCard
+            setIsLoading={setIsLoading}
+            budget={budget}
+            setBudget={setBudget}
+            duration={duration}
+            setDuration={setDuration}
+            growth={growth}
+            setGrowth={setGrowth}
+          />
 
             <div className="mt-8 w-full">
-              <ProbabilisticChart isLoading={isLoading} />
+              <ProbabilisticChart
+                isLoading={isLoading}
+                budget={budget}
+                duration={duration}
+                growth={growth}
+              />
             </div>
         </div>
 

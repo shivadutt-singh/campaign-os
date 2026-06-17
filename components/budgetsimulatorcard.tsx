@@ -1,16 +1,22 @@
 "use client";
 
-import { useState } from "react";
-
 export default function BudgetSimulatorCard({
   setIsLoading,
+  budget,
+  setBudget,
+  duration,
+  setDuration,
+  growth,
+  setGrowth,
 }: {
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  budget: number;
+  setBudget: React.Dispatch<React.SetStateAction<number>>;
+  duration: number;
+  setDuration: React.Dispatch<React.SetStateAction<number>>;
+  growth: number;
+  setGrowth: React.Dispatch<React.SetStateAction<number>>;
 }) {
-  const [budget, setBudget] = useState(50000);
-  const [duration, setDuration] = useState(6);
-  const [growth, setGrowth] = useState(15);
-
   const handleSliderRelease = () => {
   setIsLoading(true);
 
