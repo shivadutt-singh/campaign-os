@@ -1,0 +1,6 @@
+{
+  "default_insight": "AI Insight: Optimal performance detected within Bayesian bounds. No budget reallocation needed.",
+  "high_google": "AI Insight: Google Ads budget is highly optimized. Direct attribution suggests strong performance correlation.",
+  "high_facebook": "AI Insight: Facebook Ads showing positive CPA trend. Increasing budget might yield sub-linear returns due to audience fatigue.",
+  "low_overall": "AI Insight: Low budget allocation detected. Consider increasing top-of-funnel spending to boost overall pipeline velocity."
+}
