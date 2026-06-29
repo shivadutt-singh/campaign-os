@@ -1,3 +1,4 @@
+import math
 import os
 import sys
 import json
@@ -13,6 +14,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("CampaignOS_Predictor")
+logger.info("NEW AGGREGATED VERSION RUNNING")
 
 def main():
     try:
@@ -60,6 +62,7 @@ def main():
         headers = ["Date", "Channel", "Expected_Revenue", "Best_Case", "Worst_Case", "AI_Insight"]
         rows = []
         start_date = datetime.now()
+        daily_totals = {}
 
         multipliers = {
             "google_ads": 1.4, "Google Ads": 1.4,
@@ -91,27 +94,71 @@ def main():
             else:
                 ai_insight = default_insight
 
-            # Generate Simulation
-            for i in range(7):
+            # Generate Simulation     
+            for i in range(10):
                 sim_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
-                
-                seed = int(budget) + i
-                random.seed(seed)
-                noise = random.uniform(0.9, 1.1)
-                
-                expected_revenue = round(budget * (multiplier / 7.0) * noise, 2)
-                best_case = round(expected_revenue * random.uniform(1.15, 1.3), 2)
-                worst_case = round(expected_revenue * random.uniform(0.7, 0.85), 2)
+                base_daily = budget / 10
+                budget_factor = budget / 5000
+                wave = max(0.15, budget / 10000)
 
-                rows.append({
-                    "Date": sim_date,
-                    "Channel": channel,
-                    "Expected_Revenue": str(expected_revenue),
-                    "Best_Case": str(best_case),
-                    "Worst_Case": str(worst_case),
-                    "AI_Insight": ai_insight
-                })
+                seasonality = (
+                    1
+                    + budget_factor * 0.15 * math.sin(i * 0.35)
+                    + budget_factor * 0.08 * math.sin(i * 0.9)
+                    + random.uniform(-0.02, 0.02)
+                )
 
+                expected_revenue = round(
+                    base_daily
+                    * multiplier
+                    * seasonality
+                    * random.uniform(0.95, 1.08),
+                    2
+                )
+
+                best_case = round(
+                    expected_revenue * random.uniform(1.18, 1.30),
+                    2
+                )
+
+                worst_case = round(
+                    expected_revenue * random.uniform(0.72, 0.88),
+                    2
+                )
+
+                if sim_date not in daily_totals:
+                    daily_totals[sim_date] = {
+                        "Expected_Revenue": 0,
+                        "Best_Case": 0,
+                        "Worst_Case": 0,
+                        "AI_Insight": ai_insight
+                    }
+
+                daily_totals[sim_date]["Expected_Revenue"] += expected_revenue
+                daily_totals[sim_date]["Best_Case"] += best_case
+                daily_totals[sim_date]["Worst_Case"] += worst_case
+        rows = []
+
+        for date, values in daily_totals.items():
+            rows.append({
+                "Date": date,
+                "Channel": "All Channels",
+                "Expected_Revenue": round(values["Expected_Revenue"], 2),
+                "Best_Case": round(values["Best_Case"], 2),
+                "Worst_Case": round(values["Worst_Case"], 2),
+                "AI_Insight": values["AI_Insight"]
+            })
+
+        rows = sorted(rows, key=lambda x: x["Date"])
+
+        logger.info(f"FINAL ROW COUNT = {len(rows)}")
+
+        rows = sorted(rows, key=lambda x: (x["Date"], x["Channel"]))
+                
+        rows = sorted(rows, key=lambda x: (x["Date"], x["Channel"]))
+
+        print("TOTAL ROWS:", len(rows))
+        print(rows[:5])
         with open(args.output, "w", newline="", encoding="utf-8") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=headers)
             writer.writeheader()
@@ -125,6 +172,7 @@ def main():
         # Global catch-all to prevent raw Python tracebacks from breaking IPC bridge
         logger.critical(f"Fatal unhandled exception in predictor: {e}", exc_info=True)
         sys.exit(1)
+random.seed()
 
 if __name__ == "__main__":
-    main()
+    main() 

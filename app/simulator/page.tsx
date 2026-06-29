@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState , useRef } from "react";
 import { motion } from "framer-motion";
 import { 
   Rocket, 
-  ArrowRight, 
   SlidersHorizontal, 
   Activity, 
   Terminal, 
@@ -13,6 +12,7 @@ import {
   BarChart3
 } from "lucide-react";
 import Link from "next/link";
+import { Curve } from "recharts";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -21,27 +21,46 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  Legend
+  Legend,
+  CartesianGrid,
+  LineChart,
+  AreaChart,
 } from "recharts";
 
 // --- Premium Custom Tooltip for Recharts ---
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: any[];
+  label?: string;
+}) => {
+
   if (active && payload && payload.length) {
     return (
       <div className="bg-[#111111]/95 border border-white/10 p-4 shadow-2xl backdrop-blur-md rounded-lg">
         <p className="text-zinc-400 text-xs mb-3 font-mono border-b border-white/10 pb-2">
           {label}
         </p>
+
         <div className="flex flex-col gap-2">
           {payload.map((entry: any, index: number) => (
-            <div key={index} className="flex items-center justify-between gap-6 text-sm">
+            <div
+              key={index}
+              className="flex items-center justify-between gap-6 text-sm"
+            >
               <div className="flex items-center gap-2">
-                <span 
-                  className="w-2 h-2 rounded-full" 
+                <span
+                  className="w-2 h-2 rounded-full"
                   style={{ backgroundColor: entry.color }}
                 />
-                <span className="text-zinc-300">{entry.name}</span>
+                <span className="text-zinc-300">
+                  {entry.name}
+                </span>
               </div>
+
               <span className="font-mono font-bold text-white">
                 ${Number(entry.value).toLocaleString()}
               </span>
@@ -51,22 +70,47 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       </div>
     );
   }
+
   return null;
 };
 
 export default function SimulatorPage() {
+
   const [budgets, setBudgets] = useState({
     "Google Ads": 5000,
     "Facebook Ads": 3000,
     "LinkedIn Ads": 2000,
+    "TikTok Ads": 1000,
   });
+
+  const formatCurrency = (num: number) =>
+    num.toLocaleString("en-US");
+
+    const MAX_BUDGET = 100000;
+
+   const totalBudget = Object.values(budgets).reduce(
+    (sum, value) => sum + value,
+      0
+    );
+
+    const remainingBudget = MAX_BUDGET - totalBudget;
 
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [simRun, setSimRun] = useState(false);
 
+  const lastBudgets = useRef(JSON.stringify(budgets));
+
   const handleRunSimulation = async () => {
+  if (
+    JSON.stringify(budgets) === lastBudgets.current &&
+    data.length > 0
+  ) {
+    return;
+  }
+
+  lastBudgets.current = JSON.stringify(budgets);
     setLoading(true);
     setError(null);
     try {
@@ -78,10 +122,43 @@ export default function SimulatorPage() {
 
       if (!response.ok) throw new Error("Predictive engine failed to compute matrix.");
 
-      const jsonResult = await response.ok ? await response.json() : [];
-      setData(jsonResult);
-      setSimRun(true);
-    } catch (err: any) {
+      const jsonResult = await response.json();
+
+console.log("API RESPONSE:", jsonResult);
+const cleanedData = jsonResult.map((row: any) => ({
+  ...row,
+  Expected_Revenue: Number(row.Expected_Revenue),
+  Best_Case: Number(row.Best_Case),
+  Worst_Case: Number(row.Worst_Case),
+}));
+
+console.log("CLEANED:", cleanedData);
+
+const sortedData = cleanedData
+  .sort(
+    (a: any, b: any) =>
+      new Date(a.Date).getTime() -
+      new Date(b.Date).getTime()
+  )
+  .slice(0, 10);
+
+setData(sortedData);
+
+console.table(
+  cleanedData.map((row: any) => ({
+    Date: row.Date,
+    Channel: row.Channel,
+  }))
+);
+console.table(cleanedData);
+
+console.log("Rows:", jsonResult.length);
+console.table(jsonResult);
+
+
+setSimRun(true);
+    }
+    catch (err: any) {
       setError(err.message || "Execution error occurred.");
     } finally {
       setLoading(false);
@@ -89,12 +166,57 @@ export default function SimulatorPage() {
   };
 
   const handleSliderChange = (channel: string, value: number) => {
-    setBudgets((prev) => ({ ...prev, [channel]: value }));
+    const otherChannelsTotal = Object.entries(budgets)
+      .filter(([key]) => key !== channel)
+      .reduce((sum, [, val]) => sum + val, 0);
+
+    if (otherChannelsTotal + value <= MAX_BUDGET) {
+      setBudgets((prev) => ({
+        ...prev,
+        [channel]: value,
+      }));
+    }
   };
+  const projectedRevenue = data.reduce(
+    (sum, row) => sum + Number(row.Expected_Revenue || 0),
+    0
+  );
 
-  const uniqueInsights = Array.from(new Set(data.map((row: any) => row.AI_Insight))).filter(Boolean);
+  const rawROI =
+  totalBudget > 0
+    ? ((projectedRevenue - totalBudget) / totalBudget) * 100
+    : 0;
 
-  return (
+const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
+
+      const revenueLift = Math.max(
+        0,
+        Math.round(Number(roi) * 0.15)
+      );       
+
+    const confidence =
+        data.length > 0
+          ? Math.min(
+              95,
+              Math.max(
+                50,
+                Math.round(70 + roi / 5)
+              )
+            )
+          : 0;
+
+          const roiColor =
+            roi < 0
+              ? "#ef4444"
+              : roi < 30
+              ? "#facc15"
+              : "#22c55e";
+
+      const uniqueInsights = Array.from(new Set(data.map((row: any) => row.AI_Insight))).filter(Boolean);
+
+      const topChannel = Object.entries(budgets).sort((a, b) => b[1] - a[1])[0]?.[0] || "Google Ads";
+
+    return (
     <div className="relative min-h-screen bg-[#0A0A0A] text-white font-sans selection:bg-[#3bf4ff] selection:text-black flex flex-col">
       
       {/* Background Grid */}
@@ -153,29 +275,81 @@ export default function SimulatorPage() {
             </p>
           </div>
           {simRun && (
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-              className="flex items-center gap-2 text-sm text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-4 py-2 rounded-lg"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              Matrix Updated
-            </motion.div>
-          )}
+            <div className="border border-emerald-500/20 bg-emerald-500/10 rounded-xl px-4 py-3">
+              <p className="text-emerald-400 font-semibold">
+                ✓ Matrix Updated
+              </p>
+              <p className="text-xs text-zinc-500">
+                Just now
+              </p>
         </div>
+      )}
+    </div>
 
         {/* Bento Grid Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="grid lg:grid-cols-[340px_1fr] gap-8">
           
           {/* LEFT PANEL: CONTROLS (Spans 4 cols) */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="lg:col-span-4 bg-[#111111]/80 backdrop-blur-md border border-white/10 rounded-xl p-6 shadow-2xl flex flex-col gap-8 sticky top-24"
-          >
-            <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+            className="bg-zinc-900 rounded-2xl border border-zinc-800 p-6 h-fit flex flex-col gap-8 h-fit">
+           <div className="flex items-center gap-3 border-b border-white/5 pb-4">
               <div className="p-2 bg-[#5df5a5]/10 rounded-lg">
                 <SlidersHorizontal className="w-5 h-5 text-[#5df5a5]" />
               </div>
-              <h2 className="text-lg font-semibold">Budget Allocation</h2>
+
+              <h2 className="text-lg font-semibold">
+                Budget Allocation
+              </h2>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-4">
+              <div className="grid grid-cols-3 gap-6 text-center">
+                <div>
+                  <div className="flex flex-col items-center">
+                  <p className="text-[11px] uppercase tracking-wider text-zinc-500">
+                    Total
+                  </p>
+                  <p className="text-lg font-bold text-white">
+                     ${formatCurrency(MAX_BUDGET)}
+                  </p>
+                  </div>
+               </div>
+
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-zinc-500">
+                    Used
+                  </p>
+                  <p className="text-lg font-bold text-emerald-400">
+                     ${formatCurrency(totalBudget)}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-zinc-500">
+                    Left
+                  </p>
+                  <p className="text-lg font-bold text-cyan-400">
+                    ${formatCurrency(remainingBudget)}
+                  </p>
+              </div>
+           </div>
+
+              <div className="mt-4">
+                <div className="flex justify-between text-xs text-zinc-500 mb-2">
+                  <span>Budget Usage</span>
+                  <span>{Math.round((totalBudget / MAX_BUDGET) * 100)}%</span>
+                </div>
+
+                <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#5df5a5] via-[#3bf4ff] to-[#7b5ff0]"
+                    style={{
+                      width: `${(totalBudget / MAX_BUDGET) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="flex flex-col gap-6">
@@ -186,9 +360,10 @@ export default function SimulatorPage() {
                       {channel}
                     </span>
                     <span className="font-mono text-[#3bf4ff] bg-[#3bf4ff]/10 px-2 py-0.5 rounded border border-[#3bf4ff]/20">
-                      ${value.toLocaleString()}
+                      ${formatCurrency(value)}
                     </span>
                   </div>
+
                   {/* Premium Slider Customization */}
                   <div className="relative w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                     <div 
@@ -212,32 +387,303 @@ export default function SimulatorPage() {
             <button
               onClick={handleRunSimulation}
               disabled={loading}
-              className="w-full mt-2 py-3.5 bg-white text-black font-semibold tracking-wide text-sm rounded-lg hover:bg-zinc-200 disabled:bg-zinc-800 disabled:text-zinc-500 transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_30px_rgba(255,255,255,0.15)] active:scale-[0.98]"
+              className="w-full mt-2 py-5 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-semibold tracking-wide text-sm rounded-lg hover:bg-zinc-200 disabled:bg-zinc-800 disabled:text-zinc-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_30px_rgba(255,255,255,0.15)] active:scale-[0.98]"
             >
               {loading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Computing...</>
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Running AI Simulation...
+                </>
               ) : (
-                <><Rocket className="w-4 h-4" /> Generate Projection</>
+                <>
+                  <Rocket className="h-4 w-4" />
+                    Generate Projection
+                </>
               )}
             </button>
+
+                <div className="grid grid-cols-2 gap-3 mt-3">
+
+                  <button
+                    disabled={data.length === 0}
+                    onClick={() => {
+
+                      const headers = Object.keys(data[0]).join(",");
+
+                      const rows = data
+                        .map((row) =>
+                          Object.values(row)
+                            .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+                            .join(",")
+                        )
+                        .join("\n");
+
+                      const csv = `${headers}\n${rows}`;
+
+                      const blob = new Blob([csv], {
+                        type: "text/csv",
+                      });
+
+                      const url = URL.createObjectURL(blob);
+
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "forecast.csv";
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="py-3 bg-cyan-600 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-zinc-800"
+                  >
+                    Download CSV
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const defaultBudgets = {
+                        "Google Ads": 5000,
+                        "Facebook Ads": 3000,
+                        "LinkedIn Ads": 2000,
+                        "TikTok Ads": 1000,
+                      };
+
+                      setBudgets(defaultBudgets);
+                      setData([]);
+                      setSimRun(false);
+                      setError(null);
+
+                      lastBudgets.current = "";
+                    }}
+                    className="py-3 bg-zinc-700 text-white font-semibold rounded-lg hover:bg-zinc-600"
+                  >
+                    Reset Budget
+                  </button>
+
+                </div>
+                <button
+                    onClick={() => {
+                      const text =
+                        uniqueInsights.join("\n\n");
+
+                      const blob = new Blob(
+                        [text],
+                        { type: "text/plain" }
+                      );
+
+                      const url =
+                        URL.createObjectURL(blob);
+
+                      const a =
+                        document.createElement("a");
+
+                      a.href = url;
+                      a.download = "AI_Insights.txt";
+                      a.click();
+                    }}
+                    className="
+                      group
+                      relative
+                      overflow-hidden
+                      rounded-xl
+                      border
+                      border-cyan-500/20
+                      bg-cyan-500/10
+                      px-5
+                      py-3
+                      text-cyan-400
+                      font-semibold
+                      transition-all
+                      hover:bg-cyan-500/20
+                      hover:border-cyan-400/40
+                      hover:shadow-[0_0_25px_rgba(34,211,238,0.25)]
+                    "
+                  >
+                    ✦ Export AI Insights
+                  </button>
+
           </motion.div>
 
           {/* RIGHT PANEL: VISUALIZATION & LOGS (Spans 8 cols) */}
-          <div className="lg:col-span-8 flex flex-col gap-6 w-full overflow-hidden">
+          <div className="flex flex-col gap-6 w-full min-w-0">
             
             {/* Chart Panel */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-              className="bg-[#111111]/80 backdrop-blur-md border border-white/10 rounded-xl p-6 shadow-2xl min-h-[420px] flex flex-col relative group"
-            >
-              <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-6">
+              className="
+                bg-zinc-900
+                rounded-2xl
+                border
+                border-zinc-800
+                p-8 flex flex-col relative group min-w-0"
+              >
+                
+              <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-[#ffe975]/10 rounded-lg">
                     <BarChart3 className="w-5 h-5 text-[#ffe975]" />
                   </div>
                   <h2 className="text-lg font-semibold">Revenue Matrix</h2>
-                </div>
-              </div>
+               </div>
+             </div>
+
+                   {/* Revenue Matrix */}
+                  {data.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+
+                        <div className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-[#121212] to-[#0d0d0d] p-5">
+
+                        <p className="text-xs uppercase tracking-wider text-zinc-500">
+                        Projected Revenue
+                        </p>
+
+                        <div className="mt-3 flex justify-between items-end">
+
+                        <div>
+
+                        <p className="text-3xl font-bold text-cyan-400">
+                        ${formatCurrency(Math.round(projectedRevenue))}
+                        </p>
+
+                        </div>
+
+                        <div className="w-[90px] h-[45px]">
+
+                        <ResponsiveContainer>
+
+                        <LineChart data={data.slice(-7)}>
+
+                        <defs>
+
+                        <linearGradient id="revGradient">
+
+                        <stop offset="0%" stopColor="#00E5FF"/>
+
+                        <stop offset="100%" stopColor="#7B5FF0"/>
+
+                        </linearGradient>
+
+                        </defs>
+
+                        <Line
+                          type="natural"
+                          dataKey="Expected_Revenue"
+                          filter="url(#lineGlow)"
+                          stroke="#60a5fa"
+                          strokeWidth={4}
+                          dot={false}
+                          activeDot={{
+                            r: 5,
+                            strokeWidth: 0,
+                            fill: "#60a5fa",
+                          }}
+                          isAnimationActive
+                          animationDuration={1800}
+                          animationEasing="ease-out"
+                        />
+
+                        </LineChart>
+
+                        </ResponsiveContainer>
+
+                        </div>
+
+                        </div>
+
+                        </div>
+
+                        {/* ROI */}
+
+                        <div className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-[#121212] to-[#0d0d0d] p-5">
+
+                        <p className="text-xs uppercase tracking-wider text-zinc-500">
+                        ROI
+                        </p>
+
+                        <div className="mt-3 flex justify-between items-end">
+
+                        <div>
+
+                        <p
+                        className={`text-3xl font-bold ${
+                        roi < 0
+                        ? "text-red-400"
+                        : roi > 50
+                        ? "text-emerald-400"
+                        : "text-yellow-400"
+                        }`}
+                        >
+                        {roi}%
+                        </p>
+
+                        </div>
+
+                        <div className="w-[90px] h-[45px]">
+
+                        <ResponsiveContainer>
+
+                        <LineChart data={data.slice(-7)}>
+
+                        <Line
+                        type="natural"
+                        dataKey="Expected_Revenue"
+                        stroke={roiColor}
+                        strokeWidth={3}
+                        dot={false}
+                        />
+
+                        </LineChart>
+
+                        </ResponsiveContainer>
+
+                        </div>
+
+                        </div>
+
+                        </div>
+
+                        {/* Confidence */}
+
+                        <div className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-[#121212] to-[#0d0d0d] p-5">
+
+                        <p className="text-xs uppercase tracking-wider text-zinc-500">
+                        Confidence
+                        </p>
+
+                        <div className="mt-3 flex justify-between items-end">
+
+                        <div>
+
+                        <p className="text-3xl font-bold text-purple-400">
+                        {confidence}%
+                        </p>
+
+                        </div>
+
+                        <div className="w-[90px] h-[45px]">
+
+                        <ResponsiveContainer>
+
+                        <LineChart data={data.slice(-7)}>
+
+                        <Line
+                        type="natural"
+                        dataKey="Best_Case"
+                        stroke="#A855F7"
+                        strokeWidth={3}
+                        dot={false}
+                        />
+
+                        </LineChart>
+
+                        </ResponsiveContainer>
+
+                        </div>
+
+                        </div>
+
+                        </div>
+
+                        </div>
+                  )}
 
               {loading && (
                 <div className="absolute inset-0 bg-[#0A0A0A]/60 backdrop-blur-sm z-30 flex items-center justify-center rounded-xl">
@@ -254,40 +700,192 @@ export default function SimulatorPage() {
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border border-dashed border-white/10 rounded-lg bg-white/[0.02]">
                   <Activity className="w-12 h-12 text-zinc-700 mb-4" />
                   <p className="text-zinc-400 max-w-sm">
-                    Workspace is empty. Adjust your budgets and run the simulation to visualize projected bounds.
+                    No simulation data available. Allocate budget and launch the predictive engine.
                   </p>
                 </div>
               ) : (
-                <div className="w-full h-[320px] text-xs font-mono">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={data} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
-                      <XAxis dataKey="Date" stroke="#52525b" tickLine={false} axisLine={false} dy={10} />
-                      <YAxis stroke="#52525b" tickLine={false} axisLine={false} dx={-10} tickFormatter={(val) => `$${val}`} />
+                <div className="w-full h-[420px] min-w-0 text-xs font-mono">
+                  <ResponsiveContainer width="100%" height={420}>
+                    <ComposedChart data={data} margin={{ top: 25, right: 30, left: 10, bottom: 25 }}>
+                      <style>
+                        {`
+                          .recharts-curve{
+                          stroke-linecap:round;
+                          stroke-linejoin:round;
+                          }
+                        `}
+                      </style>
+
+                      <CartesianGrid
+                        stroke="rgba(255,255,255,0.03)"
+                        strokeDasharray="2 6"
+                        vertical={false}
+                      />
+
+                      <XAxis
+                        dataKey="Date"
+                        interval={0}              
+                        angle={-35}
+                        textAnchor="end"
+                        height={70}
+                        tickMargin={18}
+                        tick={{ fill: "#9ca3af", fontSize: 11 }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(value) =>
+                          new Date(value).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })
+                        }
+                      />
+
+                      <YAxis
+                        domain={[
+                          (dataMin:number) => dataMin - 500,
+                          (dataMax:number) => dataMax + 500,
+                        ]}
+                        stroke="#71717a"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fill: "#9ca3af", fontSize: 11 }}                       
+                        dx={-10}
+                        tickFormatter={(value) =>
+                          `$${(value / 1000).toFixed(1)}k`
+                        }
+                      />
                       
                       {/* Premium Custom Tooltip */}
-                      <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3f3f46', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                      <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3f3f46', strokeWidth: 2, strokeDasharray: '4 6' }} />
                       
-                      <Legend verticalAlign="top" height={40} iconType="circle" wrapperStyle={{ paddingBottom: "20px" }}/>
+                      <Legend verticalAlign="top" height={60} iconType="circle" wrapperStyle={{ paddingBottom: "40px" }}/>
                       
-                      <Area type="monotone" dataKey="Worst_Case" name="Worst Case" fill="url(#colorWorst)" stroke="none" />
-                      <Area type="monotone" dataKey="Best_Case" name="Best Case" fill="url(#colorBest)" stroke="none" />
-                      <Line type="monotone" dataKey="Expected_Revenue" name="Expected" stroke="#3bf4ff" strokeWidth={3} dot={{ r: 0 }} activeDot={{ r: 6, fill: "#3bf4ff", stroke: "#000", strokeWidth: 2 }} />
-                      
+                      <Area
+                        type="natural"
+                        dataKey="Worst_Case"
+                        stroke="#7C3AED"
+                        fill="url(#worstGradient)"
+                        strokeWidth={2}
+                        fillOpacity={0.08}
+                        dot={false}
+                        activeDot={{
+                        r:4,
+                        fill:"#7C3AED"
+                        }}
+                        isAnimationActive
+                        animationDuration={1800}
+                        animationEasing="ease-out"
+                      />
+
+                      <Area
+                        type="natural"
+                        isAnimationActive
+                        animationDuration={1800}
+                        animationEasing="ease-out"
+                        dataKey="Best_Case"
+                        stroke="#10B981"
+                        fill="url(#bestGradient)"
+                        strokeWidth={2}
+                        fillOpacity={0.08}
+                        dot={false}
+                        activeDot={{
+                        r:4,
+                        fill:"#10B981"
+                        }}
+                      />
+
+                      <Line
+                        type="natural"
+                        dataKey="Expected_Revenue"
+                        stroke="#22D3EE"
+                        strokeWidth={4}
+                        dot={false}
+                        activeDot={{
+                        r:5,
+                        stroke:"#22D3EE",
+                        strokeWidth:3,
+                        fill:"#0A0A0A"
+                        }}
+                        isAnimationActive
+                        animationDuration={1800}
+                      />
+                                                                    
+
                       {/* SVG Gradients for Area fills */}
-                      <defs>
-                        <linearGradient id="colorWorst" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#7b5ff0" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#7b5ff0" stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorBest" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#5df5a5" stopOpacity={0.2}/>
-                          <stop offset="95%" stopColor="#5df5a5" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
+                            <defs>
+
+                            <linearGradient
+                            id="bestGradient"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                            >
+
+                            <stop
+                            offset="0%"
+                            stopColor="#10B981"
+                            stopOpacity={0.35}
+                            />
+
+                            <stop
+                            offset="100%"
+                            stopColor="#10B981"
+                            stopOpacity={0}
+                            />
+
+                            </linearGradient>
+
+                            <linearGradient
+                            id="worstGradient"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                            >
+
+                            <stop
+                            offset="0%"
+                            stopColor="#7C3AED"
+                            stopOpacity={0.35}
+                            />
+
+                            <stop
+                            offset="100%"
+                            stopColor="#7C3AED"
+                            stopOpacity={0}
+                            />
+
+                            </linearGradient>
+
+                            <filter id="cyanGlow">
+
+                            <feGaussianBlur stdDeviation="5"/>
+
+                            <feMerge>
+
+                            <feMergeNode/>
+
+                            <feMergeNode in="SourceGraphic"/>
+
+                            </feMerge>
+
+                            </filter>
+                            <filter id="lineGlow" height="300%">
+                              <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
+                              <feMerge>
+                                  <feMergeNode in="coloredBlur"/>
+                                  <feMergeNode in="SourceGraphic"/>
+                              </feMerge>
+                          </filter>
+
+                            </defs>
+
+                          </ComposedChart>
+                        </ResponsiveContainer>
+
+                      </div>
+                    )}
 
               {error && (
                 <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm font-mono flex items-center gap-3">
@@ -309,7 +907,26 @@ export default function SimulatorPage() {
                 <h2 className="text-lg font-semibold">Causal Insights Log</h2>
               </div>
 
-              <div className="min-h-[100px] bg-black/60 rounded-lg border border-white/5 p-5 font-mono text-xs text-zinc-300 leading-relaxed overflow-y-auto">
+              <div className="w-full min-h-[160px] bg-black/60 rounded-lg border border-white/5 p-5 font-mono text-xs text-zinc-300">
+              {data.length > 0 && (
+                <div className="mb-4 rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+                  <p className="text-cyan-400 font-semibold">
+                    ✦ AI Recommendation
+                  </p>
+
+                  <p className="mt-2 text-zinc-300">
+                    Increase budget allocation toward
+                    <span className="text-cyan-400 font-semibold">
+                      {" "}
+                      {topChannel}
+                    </span>
+                  </p>
+
+                  <p className="mt-2 text-emerald-400 font-semibold">
+                    ↑ +{revenueLift}% Revenue Lift
+                  </p>
+                </div>
+              )}
                 {uniqueInsights.length === 0 ? (
                   <div className="flex items-center gap-2 text-zinc-600">
                     <span className="animate-pulse">_</span> Awaiting execution parameters...
