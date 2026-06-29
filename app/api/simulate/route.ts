@@ -50,6 +50,9 @@ function parseCSV(csvString: string): Array<Record<string, string>> {
 }
 
 export async function POST(request: Request) {
+
+    console.time("SIMULATION");
+  console.log("STEP 1 - Request Received");
   const projectRoot = process.cwd();
   const dataDir = path.join(projectRoot, 'data');
   
@@ -60,6 +63,7 @@ export async function POST(request: Request) {
   
   try {
     const payload = await request.json();
+    console.log("STEP 2 - JSON Parsed");
     
     await fs.mkdir(dataDir, { recursive: true });
     await fs.writeFile(tempInputPath, JSON.stringify(payload, null, 2), 'utf8');
@@ -67,18 +71,27 @@ export async function POST(request: Request) {
     // FIX 2: Use execFileAsync with array arguments to prevent Shell Injection Attacks
     const scriptPath = path.join(projectRoot, 'src', 'predict.py');
     
-    await execFileAsync('python', [
+    console.log("STEP 3 - Starting Python");
+    await execFileAsync('py', [
       scriptPath,
       '--input', tempInputPath,
       '--output', tempOutputPath
     ], { cwd: projectRoot });
+    console.log("STEP 4 - Python Finished");
 
     const csvData = await fs.readFile(tempOutputPath, 'utf8');
+
+    console.log("STEP 5 - CSV Read");
+    console.timeEnd("SIMULATION");
     const parsedData = parseCSV(csvData);
+    console.log("ROWS:", parsedData.length);
+    console.table(parsedData);
     
     return NextResponse.json(parsedData);
     
   } catch (error: any) {
+      console.timeEnd("SIMULATION");
+      
     console.error(`[ReqID: ${reqId}] IPC Simulation failed:`, error);
     return NextResponse.json(
       { error: 'Simulation execution failed', details: error.message || String(error) },
@@ -91,4 +104,4 @@ export async function POST(request: Request) {
       fs.unlink(tempOutputPath)
     ]);
   }
-}
+} 
