@@ -9,7 +9,8 @@ import {
   Terminal, 
   Loader2,
   CheckCircle2,
-  BarChart3
+  Save,
+  BarChart3,
 } from "lucide-react";
 import Link from "next/link";
 import { Curve } from "recharts";
@@ -97,20 +98,38 @@ export default function SimulatorPage() {
 
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [simRun, setSimRun] = useState(false);
 
   const lastBudgets = useRef(JSON.stringify(budgets));
 
-  const handleRunSimulation = async () => {
-  if (
-    JSON.stringify(budgets) === lastBudgets.current &&
-    data.length > 0
-  ) {
-    return;
-  }
+  const handleSaveSimulation = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch("/api/campaigns/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ budgets, projectedRevenue, roi }),
+      });
+      if (response.ok) alert("Campaign saved successfully!");
+      else throw new Error("Failed to save.");
+    } catch (err) {
+      alert("Error saving campaign.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  lastBudgets.current = JSON.stringify(budgets);
+  const handleRunSimulation = async () => {
+    if (
+      JSON.stringify(budgets) === lastBudgets.current &&
+      data.length > 0
+    ) {
+      return;
+    }
+
+    lastBudgets.current = JSON.stringify(budgets);
     setLoading(true);
     setError(null);
     try {
@@ -401,6 +420,18 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
                 </>
               )}
             </button>
+
+                {/* Save Forecast Button - Yahan add karo */}
+                {simRun && (
+                  <button
+                    onClick={handleSaveSimulation}
+                    disabled={saving}
+                    className="w-full mt-3 py-5 bg-zinc-800 text-white font-semibold rounded-lg hover:bg-zinc-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2 border border-white/10"
+                  >
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Save Forecast
+                  </button>
+                )}
 
                 <div className="grid grid-cols-2 gap-3 mt-3">
 
