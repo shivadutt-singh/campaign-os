@@ -44,8 +44,8 @@
 ## 🚀 Development Roadmap
 
 - [x] **Phase 1 (Pre-June 12):** Boilerplate setup, UI component drafting, and API exploration.
-- [ ] **Phase 2 (June 12):** Problem statement breakdown and architecture mapping.
-- [ ] **Phase 3 (June 13 - July 10):** Core vibe coding sprints, integrating AI models with the Next.js frontend.
+- [x] **Phase 2 (June 12):** Problem statement breakdown and architecture mapping.
+- [x] **Phase 3 (June 13 - July 10):** Core vibe coding sprints, integrating AI models with the Next.js frontend.
 - [ ] **Phase 4 (July 11 - July 15):** Refinement, bug squashing, and final submission packaging.
 
 ---
