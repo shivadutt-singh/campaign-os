@@ -24,3 +24,29 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@media print {
+  /* 1. Destroy browser default headers/footers */
+  @page { 
+    margin: 0; 
+  }
+  
+  /* 2. Remove all height restrictions from the app shell */
+  html, body, main, #__next, div[class*="h-screen"] {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  /* 3. Hide all non-report UI elements globally */
+  aside, nav, header, button {
+    display: none !important;
+  }
+
+  /* 4. Prevent awkward cuts */
+  table, .prevent-break, .signature-block {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
