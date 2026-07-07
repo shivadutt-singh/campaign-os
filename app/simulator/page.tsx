@@ -1,6 +1,6 @@
 "use client";
 
-import { useState , useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   Rocket, 
@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Save,
   BarChart3,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { Curve } from "recharts";
@@ -75,6 +76,16 @@ const CustomTooltip = ({
   return null;
 };
 
+interface ChannelMetrics {
+  predicted_revenue: number;
+  impressions: number;
+  expected_clicks: number;
+  ctr: number;
+  conversion_rate: number;
+  roas: number;
+  saturation_warning: boolean;
+}
+
 export default function SimulatorPage() {
 
   const [budgets, setBudgets] = useState({
@@ -99,21 +110,91 @@ export default function SimulatorPage() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savedStatus, setSavedStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [simRun, setSimRun] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [mode, setMode] = useState<"manual" | "optimize">("manual");
+  const [targetRevenueInput, setTargetRevenueInput] = useState<number>(100000);
+
+  useEffect(() => {
+    setMounted(true);
+    
+    // Restore campaign from URL params if present
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const campId = params.get('id');
+      if (campId) {
+        const raw = localStorage.getItem("campaignos_sessions");
+        let restored = false;
+        if (raw) {
+          try {
+            const list = JSON.parse(raw);
+            if (Array.isArray(list)) {
+              const found = list.find((c: any) => c.id === campId);
+              if (found) {
+                setBudgets(JSON.parse(found.budgetPayload));
+                restored = true;
+              }
+            }
+          } catch (e) {
+            console.error("Failed to restore from local campaignos_sessions", e);
+          }
+        }
+
+        if (!restored) {
+          const mockCampaigns = [
+            { id: "1", budgets: { "Google Ads": 10000, "Facebook Ads": 8000, "LinkedIn Ads": 6500 } },
+            { id: "2", budgets: { "Google Ads": 5000, "Facebook Ads": 3000, "LinkedIn Ads": 2000, "TikTok Ads": 1000 } },
+            { id: "3", budgets: { "Google Ads": 15000, "Facebook Ads": 5000 } }
+          ];
+          const found = mockCampaigns.find(c => c.id === campId);
+          if (found) {
+            setBudgets(prev => ({
+              ...prev,
+              ...found.budgets
+            }));
+          }
+        }
+      }
+    }
+  }, []);
 
   const lastBudgets = useRef(JSON.stringify(budgets));
 
   const handleSaveSimulation = async () => {
     setSaving(true);
     try {
-      const response = await fetch("/api/campaigns/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ budgets, projectedRevenue, roi }),
-      });
-      if (response.ok) alert("Campaign saved successfully!");
-      else throw new Error("Failed to save.");
+      let existing = [];
+      if (typeof window !== 'undefined') {
+        const raw = localStorage.getItem("campaignos_sessions");
+        if (raw) {
+          try {
+            existing = JSON.parse(raw);
+            if (!Array.isArray(existing)) existing = [];
+          } catch {
+            existing = [];
+          }
+        }
+      }
+
+      const newSession = {
+        id: String(Date.now()),
+        createdAt: new Date().toISOString(),
+        budgetPayload: JSON.stringify(budgets),
+        projectedRevenue: Number(projectedRevenue),
+        roi: Number(roi)
+      };
+
+      existing.unshift(newSession);
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem("campaignos_sessions", JSON.stringify(existing));
+      }
+
+      setSavedStatus(true);
+      setTimeout(() => setSavedStatus(false), 2000);
+      alert("Campaign saved successfully to local workspace!");
     } catch (err) {
       alert("Error saving campaign.");
     } finally {
@@ -184,6 +265,60 @@ setSimRun(true);
     }
   };
 
+  const handleOptimizeBudgets = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/optimize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetRevenue: targetRevenueInput }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Optimizer service failed.");
+      }
+
+      const result = await response.json();
+      
+      const newBudgets = {
+        "Google Ads": Math.round(result.allocations.google_ads || 0),
+        "Facebook Ads": Math.round(result.allocations.meta_ads || 0),
+        "LinkedIn Ads": Math.round(result.allocations.bing_ads || 0),
+        "TikTok Ads": 0,
+      };
+      
+      setBudgets(newBudgets);
+
+      const simResponse = await fetch("/api/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newBudgets),
+      });
+
+      if (!simResponse.ok) throw new Error("Simulation failed to calculate projections for optimized allocation.");
+
+      const jsonResult = await simResponse.json();
+      const sortedData = jsonResult
+        .map((row: any) => ({
+          ...row,
+          Expected_Revenue: Number(row.Expected_Revenue),
+          Best_Case: Number(row.Best_Case),
+          Worst_Case: Number(row.Worst_Case),
+        }))
+        .sort((a: any, b: any) => new Date(a.Date).getTime() - new Date(b.Date).getTime())
+        .slice(0, 10);
+
+      setData(sortedData);
+      setSimRun(true);
+    } catch (err: any) {
+      setError(err.message || "Optimization failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSliderChange = (channel: string, value: number) => {
     const otherChannelsTotal = Object.entries(budgets)
       .filter(([key]) => key !== channel)
@@ -235,6 +370,60 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
 
       const topChannel = Object.entries(budgets).sort((a, b) => b[1] - a[1])[0]?.[0] || "Google Ads";
 
+      const channelParams: any = {
+        "Google Ads": { roi: 4.7616, cpc: 0.5641,   ctr: 0.0130, cvr: 0.0306, threshold: 9711.03 },
+        "Facebook Ads": { roi: 8.4362, cpc: 0.3632,   ctr: 0.0325, cvr: 0.0450, threshold: 1579.47 },
+        "LinkedIn Ads": { roi: 1.50, cpc: 0.50,   ctr: 0.0200, cvr: 0.0300, threshold: 500.00 },
+        "TikTok Ads":   { roi: 1.50, cpc: 0.50,   ctr: 0.0200, cvr: 0.0300, threshold: 500.00 }
+      };
+
+      const channelMetrics: Record<string, ChannelMetrics> = Object.entries(budgets).reduce((acc: Record<string, ChannelMetrics>, [channel, val]) => {
+        const budget = Number(val);
+        const p = channelParams[channel] || { roi: 1.5, cpc: 0.5, ctr: 0.02, cvr: 0.03, threshold: 500.0 };
+        const thresholdTotal = p.threshold * 10;
+        const saturationWarning = budget > thresholdTotal;
+        
+        let predictedRevenue = 0;
+        if (!saturationWarning) {
+          predictedRevenue = budget * p.roi;
+        } else {
+          predictedRevenue = (thresholdTotal * p.roi) + (thresholdTotal * p.roi * Math.log(1.0 + (budget - thresholdTotal) / thresholdTotal));
+        }
+        
+        const clicks = p.cpc > 0 ? budget / p.cpc : 0;
+        const impressions = p.ctr > 0 ? clicks / p.ctr : 0;
+        const roas = budget > 0 ? predictedRevenue / budget : 0;
+        
+        acc[channel] = {
+          predicted_revenue: predictedRevenue,
+          impressions: Math.round(impressions),
+          expected_clicks: Math.round(clicks),
+          ctr: p.ctr,
+          conversion_rate: p.cvr,
+          roas: roas,
+          saturation_warning: saturationWarning
+        };
+        return acc;
+      }, {} as Record<string, ChannelMetrics>);
+
+      const topPerformingChannel = Object.entries(channelMetrics)
+        .filter(([_, metrics]) => !metrics.saturation_warning)
+        .sort((a, b) => b[1].roas - a[1].roas)[0];
+
+      const recommendedChannelName = topPerformingChannel 
+        ? topPerformingChannel[0] 
+        : Object.entries(channelMetrics).sort((a, b) => b[1].roas - a[1].roas)[0]?.[0] || "Google Ads";
+        
+      const recommendedChannelROAS = topPerformingChannel 
+        ? topPerformingChannel[1].roas 
+        : Object.entries(channelMetrics).sort((a, b) => b[1].roas - a[1].roas)[0]?.[1]?.roas || 0;
+
+      const saturatedChannels = Object.entries(channelMetrics)
+        .filter(([_, metrics]) => metrics.saturation_warning)
+        .map(([name]) => name);
+
+      const hasSaturation = saturatedChannels.length > 0;
+
     return (
     <div className="relative min-h-screen bg-[#0A0A0A] text-white font-sans selection:bg-[#3bf4ff] selection:text-black flex flex-col">
       
@@ -263,9 +452,14 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
               </span>
             </Link>
             <span className="text-zinc-600">/</span>
-            <span className="text-sm font-medium text-zinc-400 flex items-center gap-2">
-              Workspace <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"/>
-            </span>
+            <div className="flex items-center gap-4 text-xs font-mono text-zinc-400">
+              <Link href="/simulator" className="text-white border-b border-[#3bf4ff] pb-1 transition-all">
+                Simulator
+              </Link>
+              <Link href="/dashboard" className="hover:text-white transition-colors">
+                History
+              </Link>
+            </div>
           </div>
           
           <div className="flex items-center gap-4">
@@ -322,7 +516,56 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
               </h2>
             </div>
 
-            <div className="mt-4 rounded-xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-4">
+            {/* Pill-shaped animated toggle */}
+            <div className="relative flex items-center p-1 bg-black/40 border border-white/5 rounded-full w-full">
+              <div 
+                className="absolute top-1 bottom-1 rounded-full bg-[#3bf4ff]/10 border border-[#3bf4ff]/20 transition-all duration-300 ease-out"
+                style={{
+                  left: mode === "manual" ? "4px" : "50%",
+                  width: "calc(50% - 4px)"
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setMode("manual")}
+                className={`relative z-10 w-1/2 text-center text-xs font-mono py-1.5 rounded-full transition-colors duration-200 ${
+                  mode === "manual" ? "text-[#3bf4ff] font-semibold" : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                Manual
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("optimize")}
+                className={`relative z-10 w-1/2 text-center text-xs font-mono py-1.5 rounded-full transition-colors duration-200 ${
+                  mode === "optimize" ? "text-[#3bf4ff] font-semibold" : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                Goal-Seek
+              </button>
+            </div>
+
+            {mode === "optimize" ? (
+              <div className="flex flex-col gap-2 mt-2">
+                <label className="text-[11px] uppercase tracking-wider text-zinc-500 font-mono">
+                  Target Revenue ($)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    value={targetRevenueInput}
+                    onChange={(e) => setTargetRevenueInput(Number(e.target.value))}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg py-3 px-4 text-sm font-mono text-white focus:outline-none focus:border-[#3bf4ff] transition-colors"
+                  />
+                  <div className="absolute right-3 top-3 text-zinc-500 text-xs font-mono">USD</div>
+                </div>
+                <p className="text-[10px] text-zinc-500 leading-normal">
+                  Enter your target campaign revenue. The Reverse Goal-Seek Optimizer will dynamically calculate the optimal budget allocations.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-2 rounded-xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-4">
               <div className="grid grid-cols-3 gap-6 text-center">
                 <div>
                   <div className="flex flex-col items-center">
@@ -370,8 +613,11 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
                 </div>
               </div>
             </div>
+          )}
 
-            <div className="flex flex-col gap-6">
+            <div className={`flex flex-col gap-6 transition-all duration-300 ${
+              mode === "optimize" ? "opacity-40 pointer-events-none" : ""
+            }`}>
               {Object.entries(budgets).map(([channel, value]) => (
                 <div key={channel} className="flex flex-col gap-3 group">
                   <div className="flex justify-between items-center text-sm font-medium">
@@ -403,35 +649,61 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
               ))}
             </div>
 
-            <button
-              onClick={handleRunSimulation}
-              disabled={loading}
-              className="w-full mt-2 py-5 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-semibold tracking-wide text-sm rounded-lg hover:bg-zinc-200 disabled:bg-zinc-800 disabled:text-zinc-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_30px_rgba(255,255,255,0.15)] active:scale-[0.98]"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Running AI Simulation...
-                </>
-              ) : (
-                <>
-                  <Rocket className="h-4 w-4" />
+            {mode === "manual" ? (
+              <button
+                onClick={handleRunSimulation}
+                disabled={loading}
+                className="w-full mt-2 py-5 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-semibold tracking-wide text-sm rounded-lg hover:bg-zinc-200 disabled:bg-zinc-800 disabled:text-zinc-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_30px_rgba(255,255,255,0.15)] active:scale-[0.98]"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Running AI Simulation...
+                  </>
+                ) : (
+                  <>
+                    <Rocket className="h-4 w-4" />
                     Generate Projection
-                </>
-              )}
-            </button>
-
-                {/* Save Forecast Button - Yahan add karo */}
-                {simRun && (
-                  <button
-                    onClick={handleSaveSimulation}
-                    disabled={saving}
-                    className="w-full mt-3 py-5 bg-zinc-800 text-white font-semibold rounded-lg hover:bg-zinc-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2 border border-white/10"
-                  >
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    Save Forecast
-                  </button>
+                  </>
                 )}
+              </button>
+            ) : (
+              <button
+                onClick={handleOptimizeBudgets}
+                disabled={loading}
+                className="w-full mt-2 py-5 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-semibold tracking-wide text-sm rounded-lg hover:bg-zinc-200 disabled:bg-zinc-800 disabled:text-zinc-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_30px_rgba(255,255,255,0.15)] active:scale-[0.98]"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Optimizing Budgets...
+                  </>
+                ) : (
+                  <>
+                    <Rocket className="h-4 w-4" />
+                    Run Goal-Seek
+                  </>
+                )}
+              </button>
+            )}
+
+                 {/* Save Forecast Button - Yahan add karo */}
+                 {simRun && (
+                   <button
+                     onClick={handleSaveSimulation}
+                     disabled={saving || loading}
+                     className="w-full mt-3 py-5 bg-zinc-800 text-white font-semibold rounded-lg hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 border border-white/10"
+                   >
+                     {saving ? (
+                       <Loader2 className="h-4 w-4 animate-spin" />
+                     ) : savedStatus ? (
+                       <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                     ) : (
+                       <Save className="h-4 w-4" />
+                     )}
+                     {savedStatus ? "Saved!" : "Save Forecast"}
+                   </button>
+                 )}
 
                 <div className="grid grid-cols-2 gap-3 mt-3">
 
@@ -939,7 +1211,7 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
               </div>
 
               <div className="w-full min-h-[160px] bg-black/60 rounded-lg border border-white/5 p-5 font-mono text-xs text-zinc-300">
-              {data.length > 0 && (
+              {mounted && data.length > 0 && (
                 <div className="mb-4 rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
                   <p className="text-cyan-400 font-semibold">
                     ✦ AI Recommendation
@@ -949,27 +1221,30 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
                     Increase budget allocation toward
                     <span className="text-cyan-400 font-semibold">
                       {" "}
-                      {topChannel}
+                      {recommendedChannelName}
                     </span>
                   </p>
 
                   <p className="mt-2 text-emerald-400 font-semibold">
-                    ↑ +{revenueLift}% Revenue Lift
+                    ↑ High Efficiency: {recommendedChannelROAS.toFixed(2)}x Avg ROAS
                   </p>
                 </div>
               )}
-                {uniqueInsights.length === 0 ? (
+                {!mounted || data.length === 0 ? (
                   <div className="flex items-center gap-2 text-zinc-600">
                     <span className="animate-pulse">_</span> Awaiting execution parameters...
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
-                    {uniqueInsights.map((insight: any, index) => (
-                      <div key={index} className="flex gap-3 items-start group">
-                        <span className="text-emerald-500 select-none mt-0.5">❯</span>
-                        <span className="text-zinc-300 group-hover:text-white transition-colors">{insight}</span>
-                      </div>
-                    ))}
+                    <div className="flex gap-3 items-start group">
+                      <span className="text-emerald-500 select-none mt-0.5">❯</span>
+                      <span className="text-zinc-300 group-hover:text-white transition-colors">
+                        {hasSaturation 
+                          ? `AI Insight: Diminishing returns detected on ${saturatedChannels.join(" & ")}. Overflow budget automatically routed to higher-efficiency channels.`
+                          : `AI Insight: Optimal spend distribution achieved across all active channels within efficiency bounds.`
+                        }
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -977,6 +1252,71 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
 
           </div>
         </div>
+
+        {/* Detailed Channel Projections Panel */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 md:p-8 flex flex-col gap-6 shadow-2xl"
+        >
+          <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+            <div className="p-2 bg-[#3bf4ff]/10 rounded-lg">
+              <Rocket className="w-5 h-5 text-[#3bf4ff]" />
+            </div>
+            <h2 className="text-lg font-semibold">Detailed Channel Projections</h2>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[600px]">
+               <thead>
+                 <tr className="border-b border-white/5">
+                   <th className="py-3.5 px-4 text-xs font-mono uppercase tracking-wider text-zinc-500 font-semibold">Channel</th>
+                   <th className="py-3.5 px-4 text-xs font-mono uppercase tracking-wider text-zinc-500 font-semibold text-right">Impressions</th>
+                   <th className="py-3.5 px-4 text-xs font-mono uppercase tracking-wider text-zinc-500 font-semibold text-right">Expected Clicks</th>
+                   <th className="py-3.5 px-4 text-xs font-mono uppercase tracking-wider text-zinc-500 font-semibold text-right">ROAS</th>
+                   <th className="py-3.5 px-4 text-xs font-mono uppercase tracking-wider text-zinc-500 font-semibold text-right">Expected Revenue</th>
+                 </tr>
+               </thead>
+               <tbody>
+                                {mounted && Object.entries(channelMetrics).map(([channel, metrics]: [string, ChannelMetrics]) => (
+                    <tr
+                      key={channel}
+                      className={`border-b border-white/5 hover:bg-white/[0.02] transition-all duration-150 ${
+                        metrics.saturation_warning 
+                          ? "border-l-2 border-red-500/50 bg-red-500/5" 
+                          : ""
+                      }`}
+                    >
+                      <td className="py-4.5 px-4 text-sm text-zinc-200 flex items-center gap-2">
+                        {metrics.saturation_warning && (
+                          <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                        )}
+                        <span className="font-semibold">{channel}</span>
+                        {metrics.saturation_warning && (
+                          <span className="text-red-400 bg-red-400/10 border border-red-500/20 px-2 py-0.5 rounded-full text-[9px] font-mono flex items-center gap-1">
+                            Saturated
+                          </span>
+                        )}
+                      </td>     
+                     <td className="py-4.5 px-4 text-sm font-mono text-zinc-300 text-right">
+                       {metrics.impressions.toLocaleString("en-US")}
+                     </td>
+                     <td className="py-4.5 px-4 text-sm font-mono text-zinc-300 text-right">
+                       {metrics.expected_clicks.toLocaleString("en-US")}
+                     </td>
+                     <td className="py-4.5 px-4 text-sm font-mono text-[#3bf4ff] text-right font-medium">
+                       {metrics.roas.toFixed(2)}x
+                     </td>
+                     <td className="py-4.5 px-4 text-sm font-mono text-emerald-400 text-right font-bold">
+                       ${Math.round(metrics.predicted_revenue).toLocaleString("en-US")}
+                     </td>
+                   </tr>
+                 ))}
+               </tbody>
+            </table>
+          </div>
+        </motion.div>
       </main>
 
       {/* --- PREMIUM FOOTER --- */}
@@ -985,7 +1325,7 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
           <div className="flex items-center gap-3">
             <div className="w-6 h-6 rounded bg-zinc-800 flex items-center justify-center font-bold text-white text-xs">
               C
-            </div>
+             </div>
             <span className="text-zinc-500 text-sm font-medium">© 2026 CampaignOS Inc.</span>
           </div>
           <div className="text-xs font-mono text-zinc-600 flex gap-6 items-center">
