@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     console.timeEnd("SIMULATION");
     const parsedData = parseCSV(csvData);
     console.log("ROWS:", parsedData.length);
-    console.table(parsedData);
+    //console.table(parsedData);
     
     return NextResponse.json(parsedData);
     

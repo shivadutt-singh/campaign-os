@@ -93,6 +93,7 @@ export default function SimulatorPage() {
     "Facebook Ads": 3000,
     "LinkedIn Ads": 2000,
     "TikTok Ads": 1000,
+    "Bing Ads": 2000,
   });
 
   const formatCurrency = (num: number) =>
@@ -285,8 +286,9 @@ setSimRun(true);
       const newBudgets = {
         "Google Ads": Math.round(result.allocations.google_ads || 0),
         "Facebook Ads": Math.round(result.allocations.meta_ads || 0),
-        "LinkedIn Ads": Math.round(result.allocations.bing_ads || 0),
+        "LinkedIn Ads": 0,
         "TikTok Ads": 0,
+        "Bing Ads": Math.round(result.allocations.bing_ads || 0),
       };
       
       setBudgets(newBudgets);
@@ -374,7 +376,8 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
         "Google Ads": { roi: 4.7616, cpc: 0.5641,   ctr: 0.0130, cvr: 0.0306, threshold: 9711.03 },
         "Facebook Ads": { roi: 8.4362, cpc: 0.3632,   ctr: 0.0325, cvr: 0.0450, threshold: 1579.47 },
         "LinkedIn Ads": { roi: 1.50, cpc: 0.50,   ctr: 0.0200, cvr: 0.0300, threshold: 500.00 },
-        "TikTok Ads":   { roi: 1.50, cpc: 0.50,   ctr: 0.0200, cvr: 0.0300, threshold: 500.00 }
+        "TikTok Ads":   { roi: 1.50, cpc: 0.50,   ctr: 0.0200, cvr: 0.0300, threshold: 500.00 },
+        "Bing Ads":     { roi: 4.36, cpc: 1.00,   ctr: 0.0322, cvr: 0.0165, threshold: 167.30 }
       };
 
       const channelMetrics: Record<string, ChannelMetrics> = Object.entries(budgets).reduce((acc: Record<string, ChannelMetrics>, [channel, val]) => {
@@ -440,37 +443,15 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
       />
 
       {/* --- PREMIUM NAVBAR --- */}
-      <nav className="relative z-50 w-full border-b border-white/5 bg-[#0A0A0A]/80 backdrop-blur-xl sticky top-0">
-        <div className="max-w-[1400px] mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2 group">
-              <div className="w-7 h-7 rounded bg-[#7b5ff0] flex items-center justify-center font-bold text-black group-hover:scale-105 transition-transform">
-                C
-              </div>
-              <span className="font-semibold text-zinc-100 tracking-tight group-hover:text-white transition-colors">
-                CampaignOS
-              </span>
-            </Link>
-            <span className="text-zinc-600">/</span>
-            <div className="flex items-center gap-4 text-xs font-mono text-zinc-400">
-              <Link href="/simulator" className="text-white border-b border-[#3bf4ff] pb-1 transition-all">
-                Simulator
-              </Link>
-              <Link href="/dashboard" className="hover:text-white transition-colors">
-                History
-              </Link>
-            </div>
+      <nav className="relative z-50 w-full border-b border-white/10 bg-[#0A0A0A]/80 backdrop-blur-xl sticky top-0 h-16 flex items-center justify-end px-8">
+        <div className="flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-md text-xs font-mono text-zinc-300">
+            <Activity className="w-3.5 h-3.5 text-emerald-400" />
+            SYSTEM_ONLINE
           </div>
-          
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-md text-xs font-mono text-zinc-300">
-              <Activity className="w-3.5 h-3.5 text-emerald-400" />
-              SYSTEM_ONLINE
-            </div>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#5df5a5] to-[#3bf4ff] p-[1px] cursor-pointer">
-              <div className="w-full h-full bg-black rounded-full flex items-center justify-center text-xs font-bold">
-                US
-              </div>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#5df5a5] to-[#3bf4ff] p-[1px] cursor-pointer">
+            <div className="w-full h-full bg-black rounded-full flex items-center justify-center text-xs font-bold">
+              US
             </div>
           </div>
         </div>
@@ -747,6 +728,7 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
                         "Facebook Ads": 3000,
                         "LinkedIn Ads": 2000,
                         "TikTok Ads": 1000,
+                        "Bing Ads": 2000,
                       };
 
                       setBudgets(defaultBudgets);
