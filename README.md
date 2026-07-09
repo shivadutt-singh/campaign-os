@@ -1,73 +1,163 @@
-<div align="center">
-  <h1>🚀 CampaignOS</h1>
-  <p><b>Next-Gen B2B Digital Marketing Suite • NetElixir AIgnition 3.0</b></p>
-  
-  [![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](#)
-  [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](#)
-  [![Tailwind](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](#)
-  [![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](#)
-  [![AI Agents](https://img.shields.io/badge/Powered_by-AI_Agents-FF6B6B?style=for-the-badge)](#)
-</div>
+# CampaignOS - Enterprise AI Marketing Intelligence Platform
+
+[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
+[![Celery](https://img.shields.io/badge/celery-%2337814A.svg?style=for-the-badge&logo=celery&logoColor=white)](https://docs.celeryq.dev)
+[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com)
+
+**CampaignOS** is an enterprise-grade Micro-SaaS platform that automates complex digital marketing workflows with Applied Artificial Intelligence. It leverages a decoupled, multi-container architecture containing a Next.js client, a high-performance FastAPI server, async database queries, background workers, dynamic time-series forecasting, and budget optimization solvers.
 
 ---
 
-## 📖 Overview
-**CampaignOS** is an intelligent, production-grade Micro-SaaS platform designed to automate complex digital marketing workflows with Applied AI. Built specifically for the **NetElixir AIgnition 3.0 Hackathon**, this project focuses on delivering real-world business value through predictive analytics, automated copywriting, and seamless UI/UX.
+## 📖 Detailed Sub-Guides
+
+For deep-dive documentation, please consult the dedicated READMEs:
+*   📚 **[Backend Developer Guide](file:///Users/shanipratapsingh/Downloads/campaign-os/backend/README.md)**: DB Schema, REST Endpoints, OAuth2, Caching, background Celery tasks, and Swagger.
+*   🧠 **[AI/ML Engineering Guide](file:///Users/shanipratapsingh/Downloads/campaign-os/ai-ml/README.md)**: AutoML pipeline, SLSQP & Genetic Solvers, LLM integrations, cached embeddings, vector stores, RAG, and drift audits.
 
 ---
 
-## 👥 Core Team & Assigned Roles
+## 🏗️ System Architecture
 
-| Team Member | Role | Key Responsibilities |
-| :--- | :--- | :--- |
-| **Shivadutt Singh** 👑 | **Team Lead / Full-Stack** | Next.js setup, core architecture, API routes, repository management, and UI integration. |
-| **Shani** 🧠 | **AI / Backend Engineer** | Model integration (Gemini/Llama), prompt engineering, data processing pipelines, and AI endpoints. |
-| **Vanshika** 🎨 | **Frontend Developer** | Crafting HTML/CSS layouts, responsive cards, forms, and core web components. |
+CampaignOS uses a multi-tier microservice architecture:
 
----
-
-## 🛠️ Technical Arsenal
-
-### Frontend Ecosystem
-*   **Framework:** Next.js (14/15) bootstrapped with `create-next-app`
-*   **Library:** React.js
-*   **Styling:** Tailwind CSS / Custom Minimalist UI
-*   **Typography:** Optimized with `next/font` (Geist font family)
-
-### Backend & AI Intelligence
-*   **Environment:** Node.js API Routes & Python
-*   **AI Models:** Google Gemini API / NVIDIA NIM (DeepSeek/Llama)
-*   **Data Processing:** Pandas / NumPy (Python)
+```mermaid
+graph TD
+    Client[Next.js Frontend] -->|API Proxy| Gateway[Next.js API Gateway]
+    Gateway -->|HTTP proxy on port 80| Nginx[Nginx Reverse Proxy]
+    Nginx -->|Route API| Backend[FastAPI Backend]
+    Backend -->|Async Engine| DB[(PostgreSQL Database)]
+    Backend -->|Read/Write Session| Redis[(Redis Cache / Rate Limiter)]
+    Backend -->|Trigger Jobs| Celery[Celery Tasks worker]
+    Celery -->|Queue broker| RabbitMQ[(RabbitMQ Broker)]
+    Celery -->|Evaluate Models| AIML[AI/ML Core Solver/Predictor]
+    AIML -->|Embeddings cache| SQLite[(SQLite Embeddings Cache)]
+    AIML -->|Vector retrieve| Chroma[(ChromaDB persistent store)]
+```
 
 ---
 
-## 🚀 Development Roadmap
+## 📁 Repository Structure
 
-- [x] **Phase 1 (Pre-June 12):** Boilerplate setup, UI component drafting, and API exploration.
-- [ ] **Phase 2 (June 12):** Problem statement breakdown and architecture mapping.
-- [ ] **Phase 3 (June 13 - July 10):** Core vibe coding sprints, integrating AI models with the Next.js frontend.
-- [ ] **Phase 4 (July 11 - July 15):** Refinement, bug squashing, and final submission packaging.
+```
+.
+├── backend/                  # FastAPI web server, async database, models, Celery tasks
+│   ├── app/                  # REST routers, security modules, database configuration
+│   ├── migrations/           # Alembic async migration files
+│   └── README.md             # Backend Developer Guide
+│
+├── ai-ml/                    # Machine Learning modeling, forecasting, RAG, vector store
+│   ├── optimization/         # SLSQP & Genetic Algorithm budget allocators
+│   ├── forecasting/          # Time-series projection models
+│   ├── rag/                  # Chunking and semantic retrieval
+│   └── README.md             # AI Engineering Guide
+│
+├── nginx/                    # Production reverse proxy configuration
+├── Dockerfile                # Frontend Next.js production build file
+└── docker-compose.yml        # Orchestrates the multi-container architecture
+```
 
 ---
 
-## 💻 Getting Started (For Contributors)
+## ✨ Features
 
-### 1. Clone the repository
+*   🔐 **Enterprise Auth**: Stateless JWT, secure password hashing, refresh tokens, role-based controls (Admin, Manager, Viewer).
+*   🚀 **Budget Optimization**: Computes optimal allocations using continuous SLSQP programming and tourney selection Genetic Algorithms.
+*   📈 **Time-Series Forecasting**: Simulates dynamic 10-day budget returns under logistical diminishing return metrics.
+*   🧠 **LLM & RAG Integration**: Embeddings-cached retrieval over ad copy guidelines via ChromaDB and Gemini/OpenAI interfaces.
+*   ⚙️ **Background AutoML Pipeline**: Schedules parallel training compared across Random Forest, XGBoost, and linear models using Celery.
+*   📊 **Monitoring & Drift**: Live Prometheus scrapers, health probes, Kolmogorov-Smirnov data drift tests, and PSI prediction drift audits.
+
+---
+
+## 🛠️ Tech Stack
+
+*   **Frontend**: Next.js 16, React 19, Tailwind CSS, Recharts
+*   **Backend**: FastAPI, Python 3.12, SQLAlchemy 2.0 Async, Alembic, Gunicorn
+*   **Databases**: PostgreSQL (Relational), Redis (Cache & Rate-limiting), ChromaDB (Vector)
+*   **Task Queue**: Celery, RabbitMQ Broker
+*   **Deployment**: Docker, Docker Compose, Nginx
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+*   Node.js 20+
+*   Python 3.12+
+*   Docker & Docker Compose
+
+### Environment Variables
+Copy `.env.example` in the root folder and fill in your cloud keys:
 ```bash
-git clone [https://github.com/shivadutt-singh/campaign-os.git](https://github.com/shivadutt-singh/campaign-os.git)
+cp .env.example .env
+```
 
+---
 
-cd campaign-os
+## 📦 Run with Docker (Recommended)
+
+To compile and launch all database containers, caching nodes, workers, Nginx proxies, and client interfaces:
+```bash
+docker compose up --build -d
+```
+Access the application at `http://localhost/` (Nginx port 80 proxy).
+
+---
+
+## 💻 Local Development Setup
+
+### Running Frontend
 ```bash
 npm install
-```
-### 1. Run the Development Server
-
-```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Serves client at http://localhost:3000
+```
+
+### Running Backend
+```bash
+cd backend
+python3.12 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+```
+
+### Running AI/ML Worker
+Ensure Redis and RabbitMQ are running, then start the Celery background worker:
+```bash
+cd backend
+source venv/bin/activate
+PYTHONPATH=.:../ai-ml celery -A app.core.celery_app worker --loglevel=info
+```
+
+---
+
+## 📡 API Overview
+
+| Endpoint | Method | Role Allowed | Description |
+| :--- | :--- | :--- | :--- |
+| `/api/v1/auth/login` | `POST` | Public | Standard JWT Password Login |
+| `/api/v1/campaigns/` | `GET/POST`| Manager, Viewer | Manage Organization campaigns |
+| `/api/v1/optimize/` | `POST` | Manager | Solve budget allocations |
+| `/api/v1/simulate/` | `POST` | Viewer | Simulate ad spend trajectory |
+| `/api/v1/ml/train` | `POST` | Manager | Trigger AutoML training task |
+
+---
+
+## 🖼️ Screenshots
+
+| Campaign Dashboard | Budget Optimizer Slider |
+| :---: | :---: |
+| ![Dashboard Placeholder](https://via.placeholder.com/600x350.png?text=CampaignOS+Dashboard) | ![Optimizer Slider](https://via.placeholder.com/600x350.png?text=Budget+Optimization+Slider) |
+
+---
+
+## 🤝 Contributing
+Contributions are welcome. Please read our guidelines and check tests before submitting pull requests.
+
+## 📄 License
+This project is licensed under the Apache 2.0 License.
