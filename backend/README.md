@@ -1,47 +1,31 @@
-# CampaignOS Backend Developer Guide
+# CampaignOS Backend: Developer Guide
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org)
-[![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
-[![Celery](https://img.shields.io/badge/celery-%2337814A.svg?style=for-the-badge&logo=celery&logoColor=white)](https://docs.celeryq.dev)
-
-This documentation provides the technical blueprint and reference guide for developing, testing, deploying, and scaling the FastAPI backend for CampaignOS.
+This directory houses the FastAPI enterprise backend orchestration server for CampaignOS. It handles campaign lifecycle states, token authorization, background cron jobs, and database interactions, and acts as the secure API gateway for the Next.js client.
 
 ---
 
-## 📖 Backend Overview
+## 🏗️ Architecture Overview
 
-The CampaignOS backend serves as the core business logic gatekeeper and API gateway. It provides transactional database reads/writes, secure state persistence, background model-training orchestration, rate limiting, stateless token authorization, and health diagnostics.
-
----
-
-## 🏗️ Architecture & Flow
-
-The backend exposes an asynchronous RESTful API layer interacting with PostgreSQL via SQLAlchemy 2.0 Async engines and triggers long-running CPU-bound ML computations using Celery via RabbitMQ.
+The backend uses a layered, asynchronous Repository-Service architecture built with FastAPI and SQLAlchemy 2.0.
 
 ```mermaid
-sequenceDiagram
-    participant API as FastAPI Client/Router
-    participant Auth as JWT / API Key Validator
-    participant Repo as Async Repository Layer
-    participant Task as Celery Task Dispatcher
-    participant DB as PostgreSQL (asyncpg)
-    participant Broker as RabbitMQ Broker
-
-    API->>Auth: Validate Token / API Key
-    Auth-->>API: Authentication Succeeded
-    alt Read / Write State
-        API->>Repo: Query db session
-        Repo->>DB: execute SELECT / INSERT
-        DB-->>Repo: row results
-        Repo-->>API: returned entity models
-    else Schedule AutoML Job
-        API->>Task: trigger .delay()
-        Task->>Broker: publish Celery task queue
-        Broker-->>Task: task acknowledged
-        Task-->>API: return job UUID (220 ACCEPTED)
-    end
+graph TD
+    Client[Next.js Client] -->|HTTP / WebSockets| Nginx[Nginx Reverse Proxy]
+    Nginx -->|Port 8000| FastAPI[FastAPI Server]
+    FastAPI -->|Async Sessions| PG[(PostgreSQL Database)]
+    FastAPI -->|Rate Limiter & Cache| Redis[(Redis Cache)]
+    FastAPI -->|Produce Job| Rabbit[RabbitMQ Broker]
+    Rabbit -->|Consume Job| Celery[Celery Task Workers]
+    Celery -->|Writeback| PG
 ```
+
+### Key Components:
+- **`app.main`**: Application entrypoint configuring CORS, middleware, routers, WebSockets, and health checks.
+- **`app.api.v1`**: Versioned API endpoints (auth, campaigns, datasets, health, models, optimization, simulations, and real-time feeds).
+- **`app.core`**: Global configuration settings, database engines, security schemas, Celery setup, and feature store.
+- **`app.models`**: SQLAlchemy models declaring core entities (Users, Campaigns, OptimizationRuns, PromptTemplates).
+- **`app.repositories`**: Abstract and concrete database access layers for clean CRUD separation.
+- **`app.services`**: Core business domain logic (authentication, password hashing, and state workflows).
 
 ---
 
@@ -49,240 +33,174 @@ sequenceDiagram
 
 ```
 backend/
+├── Dockerfile                # Production multi-stage Docker build
+├── requirements.txt          # Python packages list
+├── alembic.ini               # Database migrations configuration
+├── README.md                 # This file
 ├── app/
-│   ├── api/                    # API Router registration
-│   │   ├── deps.py             # FastAPI dependency injections (get_db, current_user, RoleChecker)
-│   │   └── v1/                 # Versioned router routers
-│   │       ├── auth.py         # Login, registrations, API key creation routers
-│   │       ├── campaigns.py    # CRUD Campaign and session save endpoints
-│   │       ├── datasets.py     # CSV uploads and analysis handlers
-│   │       ├── health.py       # Live Prometheus metrics and component check handlers
-│   │       ├── ml.py           # Model registry list and training trigger endpoints
-│   │       ├── optimize.py     # Channel budget SLSQP allocation wrappers
-│   │       └── simulate.py     # Spend trajectory forecasting wrappers
-│   ├── core/
-│   │   ├── config.py           # Pydantic BaseSettings loading .env variables
-│   │   ├── database.py         # AsyncSessionDeclarative base database managers
-│   │   ├── security.py         # Bcrypt pass hashing and JWT signing helpers
-│   │   └── celery_app.py       # Celery client configurations
-│   ├── models/
-│   │   └── models.py           # SQLAlchemy database schemas mapping 22 tables
-│   ├── repositories/
-│   │   ├── base.py             # Generic repository class wrapping CRUD operations
-│   │   └── entities.py         # User, Org, Campaign repositories subclasses
-│   ├── schemas/
-│   │   └── schemas.py          # Pydantic schemas validating REST shapes
-│   ├── services/
-│   │   └── auth_service.py     # Registration, login checks, API Key validation services
-│   └── tasks.py                # CPU-bound Celery background tasks
-│
-├── migrations/                 # Alembic environment and schema migrations
-│   ├── versions/               # Generated database migration files
-│   ├── env.py                  # Alembic async migration environment
-│   └── script.py.mako          # Alembic generator python template
-├── alembic.ini                 # Alembic configurations
-├── Dockerfile                  # Production container builder
-└── requirements.txt            # Python requirements (FastAPI + ML packages)
+│   ├── main.py               # Main FastAPI runner
+│   ├── api/                  # API routers
+│   │   ├── deps.py           # Dependency injections (database sessions, auth tokens)
+│   │   └── v1/               # Router v1 endpoints
+│   ├── core/                 # App configurations and core database/security setups
+│   │   ├── config.py         # Pydantic Settings
+│   │   ├── database.py       # SQLAlchemy engine and declarative base
+│   │   ├── celery_app.py     # Celery configuration & beat schedule mappings
+│   │   ├── feature_store.py  # Moving averages, CPC/CTR, and trend utilities
+│   │   └── security.py       # Password hashing & JWT helper functions
+│   ├── models/               # SQLAlchemy DB entities
+│   ├── repositories/         # Database access layer (CRUD helpers)
+│   ├── schemas/              # Pydantic input/output serializers
+│   ├── services/             # Core workflows and authentication services
+│   ├── tasks.py              # Celery background workers tasks definitions
+│   └── tests/                # Pytest unit and integration suite
+└── migrations/               # Alembic database migration versions
 ```
 
 ---
 
-## 🛠️ Technologies & Packages
+## ⚙️ Requirements & Prerequisites
 
-*   **FastAPI**: Asynchronous web framework.
-*   **SQLAlchemy 2.0 & Asyncpg**: Async DB engine and session client.
-*   **Alembic**: Database migrations management.
-*   **Pydantic V2**: Extreme performance request/response schemas.
-*   **Celery & Pika**: Multi-thread worker node executing background ML tasks.
-*   **Redis**: High-speed memory database for caching and rate limiting.
-*   **Passlib (Bcrypt)**: Secure password hashing.
-*   **python-jose**: JWT signature validation.
+- **Python**: version `3.12+`
+- **PostgreSQL**: version `15+` (with `asyncpg` compatibility)
+- **Redis**: version `7.0+` (caches & rate limiting)
+- **RabbitMQ**: version `3.10+` (background task broker)
+- **Docker & Compose** (optional, for containerized environments)
 
 ---
 
-## 📐 Design Patterns
+## 🚀 Installation & Local Setup
 
-*   **Repository Pattern**: Isolates database queries inside `BaseRepository`, providing a clean async CRUD interface.
-*   **Service Layer**: Encapsulates auth and registration logic away from endpoint handlers inside `AuthService`.
-*   **Dependency Injection**: Exposes reusable FastAPI dependencies (e.g. `get_db`, `get_current_user`, `RoleChecker`).
-*   **Lifespan Context Manager**: Automates startup events (superuser checking and seeding) inside `Lifespan`.
+### 1. Create a Virtual Environment
+Navigate to the `backend` directory and create/activate a clean environment:
 
----
-
-## 🔒 Security Features
-
-*   **Stateless Authentication**: Signed JWT access tokens with short TTLs (60 mins) and persistent refresh tokens.
-*   **Role-Based Access (RBAC)**: Custom `RoleChecker` restricting endpoints to specific tiers (`Admin`, `Manager`, `Viewer`).
-*   **API Key Management**: Encrypted machine-to-machine calls using custom `X-API-Key` headers stored as SHA-256 hashes in PostgreSQL.
-*   **CORS**: Secure middleware restrictiveness configuration.
-*   **SQL Injection Preventative**: All database transactions are parameterized via SQLAlchemy's select constructs.
-
----
-
-## 📡 API Documentation & Examples
-
-Swagger docs are served at `http://localhost:8000/docs` and Redoc at `http://localhost:8000/redoc`.
-
-### Authentication
-
-#### 1. Register User & Organization
-`POST /api/v1/auth/register`
 ```bash
-curl -X POST "http://localhost:8000/api/v1/auth/register" \
-     -H "Content-Type: application/json" \
-     -d '{"email": "manager@test.com", "password": "SecurePassword123!", "role": "Manager"}'
-```
-Response:
-```json
-{
-  "email": "manager@test.com",
-  "role": "Manager",
-  "is_active": true,
-  "id": "2af7a7f4-8a48-43d9-9520-22c608f654b1",
-  "organization_id": "b3e34b9d-5bc3-488f-9a74-d2e8316c02ef",
-  "created_at": "2026-07-09T08:28:00"
-}
+# macOS/Linux
+cd backend
+python3.12 -m venv .venv
+source .venv/bin/activate
+
+# Windows (Command Prompt)
+cd backend
+python -m venv .venv
+.venv\Scripts\activate.bat
+
+# Windows (PowerShell)
+cd backend
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 ```
 
-#### 2. OAuth2 Password Login (Get JWT Token)
-`POST /api/v1/auth/login`
+### 2. Install Package Dependencies
+Install all backend packages:
 ```bash
-curl -X POST "http://localhost:8000/api/v1/auth/login" \
-     -H "Content-Type: application/x-www-form-urlencoded" \
-     -d "username=manager@test.com&password=SecurePassword123!"
+pip install --upgrade pip
+pip install -r requirements.txt
 ```
-Response:
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsIn...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsIn...",
-  "token_type": "bearer"
-}
+
+### 3. Setup Local Environment File
+Create a `.env` file inside the `backend` directory (use `backend/.env.example` as a template):
+```bash
+cp .env.example .env
+```
+
+Set the local database connection. To run local unit tests or lightweight servers without Postgres, you can specify SQLite:
+```env
+# Local SQLite Testing config
+DATABASE_URL="sqlite+aiosqlite:///./campaignos.db"
+```
+
+### 4. Apply Database Migrations
+Run Alembic upgrades to generate the database schema tables:
+```bash
+alembic upgrade head
 ```
 
 ---
 
-### Campaign Management
+## ⚡ Running the Backend Server
 
-#### 3. Save Campaign Session
-`POST /api/v1/campaigns/save`
+Start the Uvicorn development server:
 ```bash
-curl -X POST "http://localhost:8000/api/v1/campaigns/save" \
-     -H "Content-Type: application/json" \
-     -d '{"budgets": {"Google Ads": 12000, "Facebook Ads": 4000}, "projectedRevenue": 82000, "roi": 5.1}'
+# Reload flag enables hot-reloads on file edits
+PYTHONPATH=. uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
-Response:
-```json
-{
-  "success": true,
-  "id": "e8a34b22-832f-4883-9b6f-44e21a221fb0"
-}
-```
+
+Once running, verify connectivity:
+- **Interactive Documentation (Swagger UI)**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Redoc Documentation**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+- **Prometheus Metrics**: [http://localhost:8000/metrics](http://localhost:8000/metrics)
 
 ---
 
-### Budget Optimization & Projections
+## 📋 API Registry & Examples
 
-#### 4. Run Budget Allocation Optimizer
-`POST /api/v1/optimize/`
+### Health Check Endpoint
+Returns database connectivity, Redis connection, and RabbitMQ health logs.
+- **URL**: `GET /api/v1/health/`
+- **cURL Example**:
 ```bash
-curl -X POST "http://localhost:8000/api/v1/optimize/" \
+curl -X GET http://localhost:8000/api/v1/health/
+```
+
+### Campaign Budget Optimization
+Optimizes allocations under target ROI constraints using continuous solver engines.
+- **URL**: `POST /api/v1/optimize/`
+- **cURL Example**:
+```bash
+curl -X POST http://localhost:8000/api/v1/optimize/ \
      -H "Content-Type: application/json" \
      -d '{"targetRevenue": 100000}'
 ```
-Response:
-```json
-{
-  "target_revenue": 100000,
-  "total_recommended_budget": 24500,
-  "allocations": {
-    "google_ads": 10000,
-    "meta_ads": 8000,
-    "bing_ads": 6500
-  },
-  "saturation_warning": true,
-  "warning_message": "Google Ads reached historical saturation point. Overflow budget reallocated to Meta Ads."
-}
-```
 
-#### 5. Run Spend Simulator
-`POST /api/v1/simulate/`
+### Performance Simulation
+Runs simulated daily performance forecasting runs.
+- **URL**: `POST /api/v1/simulate/`
+- **cURL Example**:
 ```bash
-curl -X POST "http://localhost:8000/api/v1/simulate/" \
+curl -X POST http://localhost:8000/api/v1/simulate/ \
      -H "Content-Type: application/json" \
-     -d '{"Google Ads": 10000, "Facebook Ads": 5000}'
-```
-Response:
-```json
-[
-  {
-    "Date": "2026-07-09",
-    "Channel": "All Channels",
-    "Expected_Revenue": 63450.2,
-    "Best_Case": 78900.5,
-    "Worst_Case": 49100.1,
-    "AI_Insight": "AI Insight: Optimal performance detected within bounds."
-  }
-]
+     -d '{"Google Ads": 15000.0, "Facebook Ads": 10000.0}'
 ```
 
 ---
 
-## 🗄️ Database Schema Mapping
-
-CampaignOS maps **22 relational tables** inside PostgreSQL:
-1.  `users`: logins, salted passwords, and role designations.
-2.  `organizations`: corporate ownership groupings.
-3.  `sessions`: JWT refresh tokens and lifecycle limits.
-4.  `api_keys`: SHA-256 hashed keys for machine-to-machine integrations.
-5.  `campaigns`: parent marketing details (names, dates, total budgets).
-6.  `channels`: specific channel descriptors (Google Ads, Meta Ads, etc.).
-7.  `campaign_metrics`: daily logs of spend, clicks, and revenue.
-8.  `predictions`: outputs stored by target prediction dates.
-9.  `optimization_runs`: recommendations generated by budget seekers.
-10. `simulation_runs`: multi-day spend scenarios saved by slider page.
-11. `insights`: performance anomalies and growth suggestions.
-12. `recommendations`: automated channel budget actions.
-13. `models`: saved ML algorithms version paths and accuracy scores.
-14. `datasets`: uploaded CSV training files, metadata, and schemas.
-15. `training_jobs`: Celery state runners (pending, training, completed).
-16. `inference_logs`: latency, inputs, and outputs of execution runs.
-17. `audit_logs`: security record tracking (user email, action, IP).
-18. `notifications`: alerts generated for target users.
-19. `system_logs`: application error, warning, and trace files.
-20. `feature_flags`: dynamic switch toggles for testing.
-21. `user_activities`: usage metrics for platform auditing.
+## 🧪 Running Tests
+Verify backend logic and SQLite fallback configurations:
+```bash
+# Add PYTHONPATH to search path
+PYTHONPATH=. pytest app/tests/ -v
+```
 
 ---
 
-## ⚙️ Environment Variables
+## 🐋 Docker Container Commands
 
-The backend relies on the following configurations in `.env`:
+Orchestrate the backend under Docker compose:
 
-| Key | Default | Description |
-| :--- | :--- | :--- |
-| `PROJECT_NAME` | `CampaignOS Backend` | The API name shown in swagger. |
-| `SECRET_KEY` | `super-secret-key...` | Cryptographic secret for signing JWTs. |
-| `ACCESS_TOKEN_EXPIRE_MINUTES`| `60` | JWT access token lifetime in minutes. |
-| `REFRESH_TOKEN_EXPIRE_DAYS`| `7` | Session refresh token limit in days. |
-| `POSTGRES_SERVER` | `localhost` | Host address of PostgreSQL server. |
-| `POSTGRES_USER` | `postgres` | Admin user for the database. |
-| `POSTGRES_PASSWORD` | `postgres` | Password for DB connection. |
-| `POSTGRES_DB` | `campaignos` | Database name. |
-| `POSTGRES_PORT` | `5432` | Postgres listening port. |
-| `REDIS_HOST` | `localhost` | Cache server endpoint. |
-| `REDIS_PORT` | `6379` | Cache server port. |
-| `RABBITMQ_HOST` | `localhost` | Message broker host. |
-| `RABBITMQ_PORT` | `5672` | Broker listening port. |
-| `FIRST_SUPERUSER_EMAIL`| `admin@campaignos.com`| Initial superuser created on startup. |
-| `FIRST_SUPERUSER_PASSWORD`| `AdminCampaignOS123!`| Password for the initial superuser. |
+```bash
+# Build and run containers in detached mode
+docker compose up -d backend celery_worker
+
+# Stream backend container logs
+docker compose logs -f backend
+
+# Tear down backend and clear volumes
+docker compose down -v
+```
 
 ---
 
-## 📈 Performance & Scaling Guide
+## 🔧 Troubleshooting FAQ
 
-*   **Uvicorn workers**: Run FastAPI using Gunicorn with 2-4 Uvicorn workers in production to leverage multi-core processors.
-*   **Database connection pooling**: Explicitly configured connection limits (`pool_size=10`, `max_overflow=20`) to prevent DB query exhaustion under concurrent client loads.
-*   **Stateless background offloading**: Celery delegates CPU-bound ML model fitting away from the web process loop, maintaining 10ms web API responses.
-*   **Redis Caching**: Cache expensive optimization responses to prevent redundant solver calls for identical targets.
-*   **Async First**: All database actions use Python's `async/await` syntax, allowing the server to handle high numbers of concurrent web socket connections.
+### 1. `ValueError: greenlet library is required`
+**Cause**: The PostgreSQL driver or async runner is using SQLAlchemy async features without the python `greenlet` dependency.
+**Solution**: Run `pip install greenlet` inside your active virtual environment.
+
+### 2. `UnsupportedCompilationError: SQLite cannot compile type JSONB`
+**Cause**: Test suites are running on SQLite, which doesn't support PG-specific `JSONB` columns.
+**Solution**: Our system uses a custom `SQLJSON` type decorator that intercepts compiling dialects. Ensure models use `SQLJSON` rather than raw `sqlalchemy.dialects.postgresql.JSONB`.
+
+### 3. Database connection fails with `role "postgres" does not exist`
+**Cause**: The local Postgres daemon is running, but the user/password configuration or port allocation does not match the default `.env` parameters.
+**Solution**: Modify the `POSTGRES_USER` and `POSTGRES_PASSWORD` parameters inside your `.env` file to match your native Postgres roles, or switch to local sqlite for testing.

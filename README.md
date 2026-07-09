@@ -82,69 +82,134 @@ graph TD
 
 ---
 
-## 🚀 Getting Started
+## ⚙️ Prerequisites
 
-### Prerequisites
-*   Node.js 20+
-*   Python 3.12+
-*   Docker & Docker Compose
+- **Node.js**: version `20+` (NPM version `10+`)
+- **Python**: version `3.12+` (PIP version `23+`)
+- **PostgreSQL**: version `15+` (Asyncpg support)
+- **Redis**: version `7.0+`
+- **RabbitMQ**: version `3.10+`
+- **Docker & Compose**: version `20.10+` (Compose `v2.20+`)
 
-### Environment Variables
-Copy `.env.example` in the root folder and fill in your cloud keys:
-```bash
-cp .env.example .env
+---
+
+## 🔧 Environment Variables Reference
+
+Create a `.env` file at the root. The following parameters configure the application:
+
+```env
+# Next.js Server config
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/campaignos"
+NEXT_PUBLIC_API_URL="http://localhost:8000/api/v1"
+
+# FastAPI Backend Settings
+PROJECT_NAME="CampaignOS Enterprise Platform"
+SECRET_KEY="super-secret-key-to-change-in-production-environments-use-openssl-rand-hex-32"
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+REFRESH_TOKEN_EXPIRE_DAYS=7
+
+# DB Parameters (PostgreSQL)
+POSTGRES_SERVER=localhost
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=campaignos
+POSTGRES_PORT=5432
+
+# Redis Cache / Rate Limiting
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# RabbitMQ Message Broker Configuration
+RABBITMQ_HOST=localhost
+RABBITMQ_PORT=5672
+RABBITMQ_USER=guest
+RABBITMQ_PASSWORD=guest
+
+# Seed Parameters (Initial Superuser)
+FIRST_SUPERUSER_EMAIL=admin@campaignos.com
+FIRST_SUPERUSER_PASSWORD=AdminCampaignOS123!
+
+# LLM APIs Configuration Keys
+GEMINI_API_KEY=""
+OPENAI_API_KEY=""
+ANTHROPIC_API_KEY=""
+GROQ_API_KEY=""
+OPENROUTER_API_KEY=""
+OLLAMA_HOST="http://localhost:11434"
 ```
 
 ---
 
-## 📦 Run with Docker (Recommended)
+## 📦 Running the Complete Project (Step-by-Step)
 
-To compile and launch all database containers, caching nodes, workers, Nginx proxies, and client interfaces:
-```bash
-docker compose up --build -d
-```
-Access the application at `http://localhost/` (Nginx port 80 proxy).
+Follow this sequence to launch the entire multi-container environment or run it locally:
+
+### Option A: Quick Start via Docker Compose (Recommended)
+
+1.  **Clone the Repository**:
+    ```bash
+    git clone https://github.com/shivadutt-singh/campaign-os.git
+    cd campaign-os
+    ```
+2.  **Configure Environment**:
+    ```bash
+    cp .env.example .env
+    ```
+3.  **Launch All Containers**:
+    ```bash
+    docker compose up --build -d
+    ```
+4.  **Confirm Running Ports**:
+    - Frontend Interface: [http://localhost/](http://localhost/)
+    - Backend Swagger: [http://localhost:8000/docs](http://localhost:8000/docs)
+    - RabbitMQ Console: [http://localhost:15672/](http://localhost:15672/) (guest/guest)
 
 ---
 
-## 💻 Local Development Setup
+### Option B: Local Native Development Configuration
 
-### Running Frontend
+If running without Docker, follow this multi-shell setup sequence:
+
+#### Shell 1: Databases, Caches & Message Brokers
+Ensure your local system services are active:
 ```bash
-npm install
-npm run dev
-# Serves client at http://localhost:3000
+# macOS (Homebrew)
+brew services start postgresql@15
+brew services start redis
+brew services start rabbitmq
+
+# Linux (systemd)
+sudo systemctl start postgresql
+sudo systemctl start redis-server
+sudo systemctl start rabbitmq-server
 ```
 
-### Running Backend
+#### Shell 2: Alembic Migrations & FastAPI REST Server
+Navigate to `/backend`, set up virtual environment, install requirements, run migrations, and start Uvicorn:
 ```bash
 cd backend
-python3.12 -m venv venv
-source venv/bin/activate
+python3.12 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 alembic upgrade head
-uvicorn app.main:app --reload --port 8000
+PYTHONPATH=. uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Running AI/ML Worker
-Ensure Redis and RabbitMQ are running, then start the Celery background worker:
+#### Shell 3: Celery Background Task Workers
+Start the background worker in a separate terminal:
 ```bash
 cd backend
-source venv/bin/activate
+source .venv/bin/activate
 PYTHONPATH=.:../ai-ml celery -A app.core.celery_app worker --loglevel=info
 ```
 
----
-
-## 📡 API Overview
-
-| Endpoint | Method | Role Allowed | Description |
-| :--- | :--- | :--- | :--- |
-| `/api/v1/auth/login` | `POST` | Public | Standard JWT Password Login |
-| `/api/v1/campaigns/` | `GET/POST`| Manager, Viewer | Manage Organization campaigns |
-| `/api/v1/optimize/` | `POST` | Manager | Solve budget allocations |
-| `/api/v1/simulate/` | `POST` | Viewer | Simulate ad spend trajectory |
-| `/api/v1/ml/train` | `POST` | Manager | Trigger AutoML training task |
+#### Shell 4: Next.js Frontend Development
+Install frontend dependencies and start development server:
+```bash
+# From root folder
+npm install
+npm run dev
+```
 
 ---
 
