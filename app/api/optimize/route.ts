@@ -37,7 +37,8 @@ export async function POST(request: Request) {
     }, 15000);
 
     // 3. Forward payload to Python predictive engine
-    const pythonBackendUrl = 'http://localhost:8000/optimize';
+    const backendBaseUrl = process.env.BACKEND_API_URL || 'http://localhost:8000/api/v1';
+    const pythonBackendUrl = `${backendBaseUrl}/optimize`;
     
     let response: Response;
     try {
