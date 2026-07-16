@@ -93,15 +93,15 @@ chmod +x run.sh
 ./run.sh
 ```
 ---
--Generates a fallback .env with the SQLite database mapping.
+- Generates a fallback .env with the SQLite database mapping.
 
--Installs npm and pip dependencies in isolation.
+- Installs npm and pip dependencies in isolation.
 
--Executes npx prisma migrate deploy to create the schema.
+- Executes npx prisma migrate deploy to create the schema.
 
--Boots the Python FastAPI backend on http://localhost:8000.
+- Boots the Python FastAPI backend on http://localhost:8000.
 
--Builds and starts the Next.js frontend on http://localhost:3000.
+- Builds and starts the Next.js frontend on http://localhost:3000.
 
 ### Catches termination signals (SIGINT/SIGTERM) to gracefully kill background processes on exit.
 ---
