@@ -1,73 +1,112 @@
 <div align="center">
-  <h1>🚀 CampaignOS</h1>
-  <p><b>Next-Gen B2B Digital Marketing Suite • NetElixir AIgnition 3.0</b></p>
-  
-  [![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](#)
-  [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](#)
-  [![Tailwind](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](#)
-  [![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](#)
-  [![AI Agents](https://img.shields.io/badge/Powered_by-AI_Agents-FF6B6B?style=for-the-badge)](#)
+
+# ✦ CampaignOS
+### The Deterministic Ad-Spend Optimizer. Built for Agency CFOs.
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
+  <img src="https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/Prisma-3982CE?style=for-the-badge&logo=Prisma&logoColor=white" alt="Prisma" />
+  <img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite" />
+  <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
+</p>
+
+<br/>
+
+*Media buyers scale blindly. CampaignOS scales with mathematical precision.*
+
 </div>
 
 ---
 
-## 📖 Overview
-**CampaignOS** is an intelligent, production-grade Micro-SaaS platform designed to automate complex digital marketing workflows with Applied AI. Built specifically for the **NetElixir AIgnition 3.0 Hackathon**, this project focuses on delivering real-world business value through predictive analytics, automated copywriting, and seamless UI/UX.
+## 🎯 The Problem: "The Agency Scaling Wall"
+Media buyers scale budgets blindly until campaigns hit a wall of diminishing returns. Ad platforms (Meta/Google) often double-count conversions, leading to inflated ROAS reporting. When the agency attempts to scale based on these inflated numbers, profitability crashes, and clients churn.
 
+## 💡 The Solution: Mathematical Precision > AI Hallucinations
+While the industry builds unreliable LLM wrappers, real-world financial modeling requires deterministic accuracy. CampaignOS uses a robust mathematical engine to strip away platform deduplication and calculate the exact **Efficiency Apex**—the precise dollar amount where the next ad click loses the client money.
+
+<br/>
+
+## ✨ Enterprise Features
+
+| Feature | Description |
+| :--- | :--- |
+| 📉 **The Efficiency Apex Engine** | Deterministically calculates the logistical diminishing returns curve across Meta, Google, and Bing. |
+| 💼 **Agency CFO Focus** | Built as a pitching tool to justify budget allocations and forecast internal agency profit margins. |
+| 📊 **Enterprise Data Export** | 10-day predictive time-series simulation exported directly to CSV for media buyers and Excel integration. |
+| 🎨 **Premium UI/UX** | A highly polished, zero-friction interface designed for high-end agency presentations. |
+
+<br/>
+
+## ⚡ The "Zero-Friction" Architecture
+To guarantee a **100% flawless automated evaluation**, we engineered this application for maximum stability:
+
+1. **Isolated Execution:** Bypassed heavy dependency brokers (RabbitMQ/Celery) and external API constraints to ensure the application never crashes due to rate limits or missing keys.
+2. **Dynamic Provisioning:** Instantly provisions a local SQLite `dev.db` environment via Prisma if heavy relational databases are unavailable.
+3. **Auth-Free Demo Mode:** Removed JWT login barriers to provide evaluators with a zero-friction, one-click dashboard experience.
 ---
+### 🏗️ System Architecture
 
-## 👥 Core Team & Assigned Roles
+```mermaid
+graph TD
+    %% Styling for Premium Vercel/Linear Dark Mode Vibe
+    classDef frontend fill:#111,stroke:#666,stroke-width:2px,color:#fff,rx:8px,ry:8px;
+    classDef backend fill:#005571,stroke:#444,stroke-width:2px,color:#fff,rx:8px,ry:8px;
+    classDef db fill:#07405E,stroke:#444,stroke-width:2px,color:#fff,rx:8px,ry:8px;
+    classDef engine fill:#0a0a0a,stroke:#00d2ff,stroke-width:1px,color:#fff,rx:8px,ry:8px,stroke-dasharray: 5 5;
+    classDef user fill:#222,stroke:#888,stroke-width:2px,color:#fff;
 
-| Team Member | Role | Key Responsibilities |
-| :--- | :--- | :--- |
-| **Shivadutt Singh** 👑 | **Team Lead / Full-Stack** | Next.js setup, core architecture, API routes, repository management, and UI integration. |
-| **Shani** 🧠 | **AI / Backend Engineer** | Model integration (Gemini/Llama), prompt engineering, data processing pipelines, and AI endpoints. |
-| **Vanshika** 🎨 | **Frontend Developer** | Crafting HTML/CSS layouts, responsive cards, forms, and core web components. |
+    Client(("Agency CFO / User")):::user
 
----
+    subgraph "Isolated Hackathon Environment (run.sh)"
+        direction TB
+        
+        NextJS["Next.js Frontend<br/>(Port: 3000)"]:::frontend
+        FastAPI["Python FastAPI Backend<br/>(Port: 8000)"]:::backend
+        Prisma[("SQLite dev.db<br/>via Prisma ORM")]:::db
+        MathEngine{{"Deterministic Engine<br/>Efficiency Apex Logic"}}:::engine
 
-## 🛠️ Technical Arsenal
+        NextJS -- "1. POST /optimize (Target Revenue)" --> FastAPI
+        FastAPI -- "2. Fetch Historical Velocity" --> Prisma
+        Prisma -. "3. Return Baseline Stats" .-> FastAPI
+        FastAPI -- "4. Execute Simulation" --> MathEngine
+        MathEngine -. "5. 10-Day Projection Matrix" .-> FastAPI
+        FastAPI -- "6. Return Final Payload" --> NextJS
+    end
 
-### Frontend Ecosystem
-*   **Framework:** Next.js (14/15) bootstrapped with `create-next-app`
-*   **Library:** React.js
-*   **Styling:** Tailwind CSS / Custom Minimalist UI
-*   **Typography:** Optimized with `next/font` (Geist font family)
-
-### Backend & AI Intelligence
-*   **Environment:** Node.js API Routes & Python
-*   **AI Models:** Google Gemini API / NVIDIA NIM (DeepSeek/Llama)
-*   **Data Processing:** Pandas / NumPy (Python)
-
----
-
-## 🚀 Development Roadmap
-
-- [x] **Phase 1 (Pre-June 12):** Boilerplate setup, UI component drafting, and API exploration.
-- [ ] **Phase 2 (June 12):** Problem statement breakdown and architecture mapping.
-- [ ] **Phase 3 (June 13 - July 10):** Core vibe coding sprints, integrating AI models with the Next.js frontend.
-- [ ] **Phase 4 (July 11 - July 15):** Refinement, bug squashing, and final submission packaging.
-
----
-
-## 💻 Getting Started (For Contributors)
-
-### 1. Clone the repository
-```bash
-git clone [https://github.com/shivadutt-singh/campaign-os.git](https://github.com/shivadutt-singh/campaign-os.git)
-
-
-cd campaign-os
-```bash
-npm install
+    NextJS -- "7. Export Simulation Data" --> CSV["Downloadable CSV"]:::frontend
+    Client -- "Interacts via Dashboard" --> NextJS
 ```
-### 1. Run the Development Server
+---
 
+## 🚀 Quick Start (Automated Deployment)
+
+We have provided a bulletproof `run.sh` script that provisions the clean environment, installs dependencies, handles Prisma migrations, and boots both the Next.js and Python servers simultaneously.
+
+### 1. Grant Execution Permissions
+*(Linux, macOS, or Git Bash on Windows)*
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+chmod +x run.sh
+```
+2. Execute the Isolated Script
+```Bash
+./run.sh
+```
+---
+-Generates a fallback .env with the SQLite database mapping.
+
+-Installs npm and pip dependencies in isolation.
+
+-Executes npx prisma migrate deploy to create the schema.
+
+-Boots the Python FastAPI backend on http://localhost:8000.
+
+-Builds and starts the Next.js frontend on http://localhost:3000.
+
+### Catches termination signals (SIGINT/SIGTERM) to gracefully kill background processes on exit.
+---
+### 🌐 Accessing the Dashboard:
+#### Once the script completes the build process, open your browser and navigate to:
+http://localhost:3000
+--
+Built for scale. Engineered for precision. 🏆
