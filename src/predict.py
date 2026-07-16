@@ -218,12 +218,67 @@ def main():
 
         default_insight = heuristics.get("default_insight", "AI Insight: Optimal performance detected within bounds.")
 
-        # Calculate total budget safely
-        try:
-            total_budget = sum(float(val) for val in budget_data.values() if str(val).replace(".", "", 1).isdigit())
-        except Exception as e:
-            logger.warning(f"Error calculating total budget: {e}. Setting to 0.")
-            total_budget = 0.0
+        # Safely extract seasonality and competitorThreat from payload
+        seasonality = budget_data.get("seasonality", "Standard")
+        competitor_threat = budget_data.get("competitorThreat", "Low")
+
+        # Extract channel budgets safely, filtering out metadata keys
+        channels_budget = {}
+        for channel, val in budget_data.items():
+            if channel in ["seasonality", "competitorThreat", "grossMargin"]:
+                continue
+            try:
+                channels_budget[channel] = float(val)
+            except (ValueError, TypeError):
+                logger.warning(f"Non-numeric budget ignored for channel: {channel} = {val}")
+
+        # Calculate ToF and BoF spend
+        bof_channels = ["Google Ads", "Bing Ads", "google_ads", "bing_ads"]
+        tof_spend = 0.0
+        bof_spend = 0.0
+        for channel, budget in channels_budget.items():
+            ch_lower = channel.lower()
+            if any(bof in ch_lower for bof in ["google", "bing"]):
+                bof_spend += budget
+            else:
+                tof_spend += budget
+
+        total_budget = bof_spend + tof_spend
+
+        # Determine if Halo Lift applies (ToF spend > 20% of total budget)
+        apply_halo_lift = False
+        if total_budget > 0.0:
+            if (tof_spend / total_budget) > 0.20:
+                apply_halo_lift = True
+                logger.info("Halo Lift enabled (ToF spend > 20% of total budget)")
+
+        # Determine if Overlap Penalty applies (both Google and Meta Ads > 0)
+        has_google = False
+        has_meta = False
+        for channel, budget in channels_budget.items():
+            ch_lower = channel.lower()
+            if "google" in ch_lower and budget > 0.0:
+                has_google = True
+            elif ("facebook" in ch_lower or "meta" in ch_lower) and budget > 0.0:
+                has_meta = True
+
+        apply_overlap_penalty = has_google and has_meta
+        if apply_overlap_penalty:
+            logger.info("Walled Garden Overlap Penalty enabled (both Google and Meta Ads active)")
+
+        # Calculate environment multiplier
+        environment_multiplier = 1.0
+        if seasonality == "Q4 / Black Friday":
+            environment_multiplier = 1.15
+        elif seasonality == "Summer Slump":
+            environment_multiplier = 0.85
+
+        if competitor_threat == "High Auction Pressure":
+            environment_multiplier *= 0.80
+        elif competitor_threat == "Medium":
+            environment_multiplier *= 0.90
+
+        logger.info(f"Environment multiplier computed: {environment_multiplier:.4f} (Seasonality: {seasonality}, Threat: {competitor_threat})")
 
         # Load dynamic performance metrics from CSVs
         metrics = load_historical_metrics(script_dir)
@@ -235,13 +290,7 @@ def main():
         channel_metrics = {}
         total_predicted_revenue = 0.0
 
-        for channel, budget_val in budget_data.items():
-            try:
-                budget = float(budget_val)
-            except (ValueError, TypeError):
-                logger.warning(f"Invalid budget value for {channel}: '{budget_val}'. Defaulting to 0.0")
-                budget = 0.0
-
+        for channel, budget in channels_budget.items():
             # Normalize channel key to match CSV metric keys
             ch_lower = channel.lower()
             if "google" in ch_lower:
@@ -255,6 +304,10 @@ def main():
 
             ch_info = metrics.get(ch_key, metrics["default"])
             base_roi = ch_info["roi"]
+
+            # Apply Halo Lift of 1.05x to BoF channels
+            if apply_halo_lift and ("google" in ch_lower or "bing" in ch_lower):
+                base_roi *= 1.05
             cpc = ch_info["cpc"]
             ctr = ch_info["ctr"]
             cvr = ch_info["cvr"]
@@ -344,15 +397,31 @@ def main():
                 daily_totals[sim_date]["Worst_Case"] += worst_case
                 daily_totals[sim_date]["AI_Insight"] = ai_insight
 
+        # Apply global modifiers to daily totals
+        for date in daily_totals:
+            if apply_overlap_penalty:
+                daily_totals[date]["Expected_Revenue"] *= 0.92
+                daily_totals[date]["Best_Case"] *= 0.92
+                daily_totals[date]["Worst_Case"] *= 0.92
+                
+            daily_totals[date]["Expected_Revenue"] *= environment_multiplier
+            daily_totals[date]["Best_Case"] *= environment_multiplier
+            daily_totals[date]["Worst_Case"] *= environment_multiplier
+            
+            # Round properly
+            daily_totals[date]["Expected_Revenue"] = round(daily_totals[date]["Expected_Revenue"], 2)
+            daily_totals[date]["Best_Case"] = round(daily_totals[date]["Best_Case"], 2)
+            daily_totals[date]["Worst_Case"] = round(daily_totals[date]["Worst_Case"], 2)
+
         # Write simulation daily totals to CSV
         rows = []
         for date, values in daily_totals.items():
             rows.append({
                 "Date": date,
                 "Channel": "All Channels",
-                "Expected_Revenue": round(values["Expected_Revenue"], 2),
-                "Best_Case": round(values["Best_Case"], 2),
-                "Worst_Case": round(values["Worst_Case"], 2),
+                "Expected_Revenue": values["Expected_Revenue"],
+                "Best_Case": values["Best_Case"],
+                "Worst_Case": values["Worst_Case"],
                 "AI_Insight": values["AI_Insight"]
             })
 
@@ -367,9 +436,38 @@ def main():
             writer.writeheader()
             writer.writerows(rows)
 
+        # Apply global modifiers to total_predicted_revenue
+        if apply_overlap_penalty:
+            total_predicted_revenue *= 0.92
+        total_predicted_revenue *= environment_multiplier
+        total_predicted_revenue = round(total_predicted_revenue, 1)
+
+        # Apply modifiers to individual channel metrics and recalculate ROAS
+        for ch_key in channel_metrics:
+            # Find original budget for this channel
+            orig_budget = 0.0
+            for orig_ch, orig_val in channels_budget.items():
+                orig_lower = orig_ch.lower()
+                if ch_key == "google_ads" and "google" in orig_lower:
+                    orig_budget = orig_val
+                elif ch_key == "meta_ads" and ("facebook" in orig_lower or "meta" in orig_lower):
+                    orig_budget = orig_val
+                elif ch_key == "bing_ads" and "bing" in orig_lower:
+                    orig_budget = orig_val
+                elif ch_key == "default" and not ("google" in orig_lower or "bing" in orig_lower or "facebook" in orig_lower or "meta" in orig_lower):
+                    orig_budget = orig_val
+
+            if apply_overlap_penalty:
+                channel_metrics[ch_key]["predicted_revenue"] *= 0.92
+            channel_metrics[ch_key]["predicted_revenue"] *= environment_multiplier
+            channel_metrics[ch_key]["predicted_revenue"] = round(channel_metrics[ch_key]["predicted_revenue"], 1)
+            
+            # Recalculate ROAS
+            channel_metrics[ch_key]["roas"] = round(channel_metrics[ch_key]["predicted_revenue"] / orig_budget, 2) if orig_budget > 0 else 0.0
+
         # Output the enriched JSON metrics to stdout as requested by the contract
         stdout_payload = {
-            "total_predicted_revenue": round(total_predicted_revenue, 1),
+            "total_predicted_revenue": total_predicted_revenue,
             "channel_metrics": channel_metrics
         }
         print(json.dumps(stdout_payload, indent=2))

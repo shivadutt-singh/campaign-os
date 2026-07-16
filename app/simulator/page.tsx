@@ -117,6 +117,10 @@ export default function SimulatorPage() {
   const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState<"manual" | "optimize">("manual");
   const [targetRevenueInput, setTargetRevenueInput] = useState<number>(100000);
+  const [seasonality, setSeasonality] = useState<string>("Standard");
+  const [competitorThreat, setCompetitorThreat] = useState<string>("Low");
+  const [grossMargin, setGrossMargin] = useState<number>(40);
+  const [aov, setAov] = useState<number>(150);
 
   useEffect(() => {
     setMounted(true);
@@ -204,21 +208,28 @@ export default function SimulatorPage() {
   };
 
   const handleRunSimulation = async () => {
+    const payload = {
+      ...budgets,
+      seasonality,
+      competitorThreat,
+      grossMargin,
+    };
+    const payloadString = JSON.stringify(payload);
     if (
-      JSON.stringify(budgets) === lastBudgets.current &&
+      payloadString === lastBudgets.current &&
       data.length > 0
     ) {
       return;
     }
 
-    lastBudgets.current = JSON.stringify(budgets);
+    lastBudgets.current = payloadString;
     setLoading(true);
     setError(null);
     try {
       const response = await fetch("/api/simulate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(budgets),
+        body: payloadString,
       });
 
       if (!response.ok) throw new Error("Predictive engine failed to compute matrix.");
@@ -368,6 +379,11 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
               ? "#facc15"
               : "#22c55e";
 
+  const totalConversions = aov > 0 ? projectedRevenue / aov : 0;
+  const netNewCustomers = totalConversions * 0.65;
+  const blendedCac = totalConversions > 0 ? totalBudget / totalConversions : 0;
+  const trueNetNewCac = netNewCustomers > 0 ? totalBudget / netNewCustomers : 0;
+
       const uniqueInsights = Array.from(new Set(data.map((row: any) => row.AI_Insight))).filter(Boolean);
 
       const topChannel = Object.entries(budgets).sort((a, b) => b[1] - a[1])[0]?.[0] || "Google Ads";
@@ -479,6 +495,90 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
         </div>
       )}
     </div>
+
+        {/* Macro-Environment & Business Metrics Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6 shadow-xl text-neutral-200"
+        >
+          <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
+            <SlidersHorizontal className="w-5 h-5 text-cyan-400" />
+            Macro-Environment & Business Metrics
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Field 1: Seasonality */}
+            <div className="flex flex-col gap-2">
+              <label className="text-[11px] uppercase tracking-wider text-zinc-500 font-mono">
+                Seasonality
+              </label>
+              <select
+                value={seasonality}
+                onChange={(e) => setSeasonality(e.target.value)}
+                className="bg-black/40 border border-white/10 rounded-lg py-2.5 px-3 text-sm font-mono text-neutral-200 focus:outline-none focus:border-[#3bf4ff] transition-colors"
+              >
+                <option value="Standard" className="bg-zinc-900 text-white">Standard</option>
+                <option value="Q4 / Black Friday" className="bg-zinc-900 text-white">Q4 / Black Friday</option>
+                <option value="Summer Slump" className="bg-zinc-900 text-white">Summer Slump</option>
+              </select>
+            </div>
+
+            {/* Field 2: Competitor Threat */}
+            <div className="flex flex-col gap-2">
+              <label className="text-[11px] uppercase tracking-wider text-zinc-500 font-mono">
+                Competitor Threat
+              </label>
+              <select
+                value={competitorThreat}
+                onChange={(e) => setCompetitorThreat(e.target.value)}
+                className="bg-black/40 border border-white/10 rounded-lg py-2.5 px-3 text-sm font-mono text-neutral-200 focus:outline-none focus:border-[#3bf4ff] transition-colors"
+              >
+                <option value="Low" className="bg-zinc-900 text-white">Low</option>
+                <option value="Medium" className="bg-zinc-900 text-white">Medium</option>
+                <option value="High Auction Pressure" className="bg-zinc-900 text-white">High Auction Pressure</option>
+              </select>
+            </div>
+
+            {/* Field 3: Gross Margin % */}
+            <div className="flex flex-col gap-2">
+              <label className="text-[11px] uppercase tracking-wider text-zinc-500 font-mono">
+                Gross Margin %
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={grossMargin}
+                  onChange={(e) => setGrossMargin(Number(e.target.value))}
+                  className="w-full bg-black/40 border border-white/10 rounded-lg py-2.5 px-3 pr-8 text-sm font-mono text-neutral-200 focus:outline-none focus:border-[#3bf4ff] transition-colors"
+                />
+                <span className="absolute right-3 top-2.5 text-zinc-500 text-xs font-mono">%</span>
+              </div>
+              <span className="text-[10px] text-zinc-500">
+                Calculates bottom-line profitability.
+              </span>
+            </div>
+
+            {/* Field 4: Average Order Value (AOV) */}
+            <div className="flex flex-col gap-2">
+              <label className="text-[11px] uppercase tracking-wider text-zinc-500 font-mono">
+                Average Order Value (AOV)
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={aov}
+                  onChange={(e) => setAov(Number(e.target.value))}
+                  className="w-full bg-black/40 border border-white/10 rounded-lg py-2.5 px-3 pr-8 text-sm font-mono text-neutral-200 focus:outline-none focus:border-[#3bf4ff] transition-colors"
+                />
+                <span className="absolute right-3 top-2.5 text-zinc-500 text-xs font-mono">$</span>
+              </div>
+              <span className="text-[10px] text-zinc-500">
+                Calculates customer acquisition and CAC values.
+              </span>
+            </div>
+          </div>
+        </motion.div>
 
         {/* Bento Grid Layout */}
         <div className="grid lg:grid-cols-[340px_1fr] gap-8">
@@ -812,9 +912,9 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
 
                    {/* Revenue Matrix */}
                   {data.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-6">
 
-                        <div className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-[#121212] to-[#0d0d0d] p-5">
+                        <div className="col-span-1 md:col-span-2 rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-[#121212] to-[#0d0d0d] p-4 xl:p-5 flex flex-col justify-between h-full">
 
                         <p className="text-xs uppercase tracking-wider text-zinc-500">
                         Projected Revenue
@@ -822,15 +922,15 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
 
                         <div className="mt-3 flex justify-between items-end">
 
-                        <div>
+                        <div className="min-w-0">
 
-                        <p className="text-3xl font-bold text-cyan-400">
+                        <p className="text-2xl xl:text-3xl font-bold font-mono tracking-tight whitespace-nowrap text-cyan-400">
                         ${formatCurrency(Math.round(projectedRevenue))}
                         </p>
 
                         </div>
 
-                        <div className="w-[90px] h-[45px]">
+                        <div className="w-[90px] h-[45px] shrink-0">
 
                         <ResponsiveContainer>
 
@@ -877,7 +977,7 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
 
                         {/* ROI */}
 
-                        <div className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-[#121212] to-[#0d0d0d] p-5">
+                        <div className="col-span-1 md:col-span-2 rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-[#121212] to-[#0d0d0d] p-4 xl:p-5 flex flex-col justify-between h-full">
 
                         <p className="text-xs uppercase tracking-wider text-zinc-500">
                         ROI
@@ -885,10 +985,10 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
 
                         <div className="mt-3 flex justify-between items-end">
 
-                        <div>
+                        <div className="min-w-0">
 
                         <p
-                        className={`text-3xl font-bold ${
+                        className={`text-2xl xl:text-3xl font-bold font-mono tracking-tight whitespace-nowrap ${
                         roi < 0
                         ? "text-red-400"
                         : roi > 50
@@ -901,7 +1001,7 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
 
                         </div>
 
-                        <div className="w-[90px] h-[45px]">
+                        <div className="w-[90px] h-[45px] shrink-0">
 
                         <ResponsiveContainer>
 
@@ -927,7 +1027,7 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
 
                         {/* Confidence */}
 
-                        <div className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-[#121212] to-[#0d0d0d] p-5">
+                        <div className="col-span-1 md:col-span-2 rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-[#121212] to-[#0d0d0d] p-4 xl:p-5 flex flex-col justify-between h-full">
 
                         <p className="text-xs uppercase tracking-wider text-zinc-500">
                         Confidence
@@ -935,15 +1035,15 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
 
                         <div className="mt-3 flex justify-between items-end">
 
-                        <div>
+                        <div className="min-w-0">
 
-                        <p className="text-3xl font-bold text-purple-400">
+                        <p className="text-2xl xl:text-3xl font-bold font-mono tracking-tight whitespace-nowrap text-purple-400">
                         {confidence}%
                         </p>
 
                         </div>
 
-                        <div className="w-[90px] h-[45px]">
+                        <div className="w-[90px] h-[45px] shrink-0">
 
                         <ResponsiveContainer>
 
@@ -964,6 +1064,86 @@ const roi = Math.max(-100, Math.min(100, Math.round(rawROI)));
                         </div>
 
                         </div>
+
+                        </div>
+
+                        {/* Projected Net Profit */}
+
+                        <div className="col-span-1 md:col-span-3 rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-[#121212] to-[#0d0d0d] p-4 xl:p-5 flex flex-col justify-between h-full">
+
+                        <p className="text-xs uppercase tracking-wider text-zinc-500">
+                        Projected Net Profit
+                        </p>
+
+                        <div className="mt-3 flex justify-between items-end">
+
+                        <div className="min-w-0">
+
+                        <p className="text-2xl xl:text-3xl font-bold font-mono tracking-tight whitespace-nowrap text-emerald-400">
+                        ${formatCurrency(Math.round((projectedRevenue * (grossMargin / 100)) - totalBudget))}
+                        </p>
+
+                        </div>
+
+                        <div className="w-[90px] h-[45px] shrink-0">
+
+                        <ResponsiveContainer>
+
+                        <LineChart data={data.slice(-7)}>
+
+                        <Line
+                        type="natural"
+                        dataKey="Expected_Revenue"
+                        stroke="#10B981"
+                        strokeWidth={3}
+                        dot={false}
+                        />
+
+                        </LineChart>
+
+                        </ResponsiveContainer>
+
+                        </div>
+
+                        </div>
+
+                        </div>
+
+                        {/* Incrementality Truth */}
+
+                        <div className="col-span-1 md:col-span-3 bg-[#0a0a0a] border border-amber-500/30 rounded-xl p-4 xl:p-5 flex flex-col justify-between h-full">
+
+                        <div>
+
+                        <h3 className="text-[10px] font-mono tracking-widest text-amber-500 uppercase mb-4">Incrementality Truth</h3>
+
+                        <div className="flex flex-col gap-3 mt-auto mb-2">
+
+                        <div className="flex flex-col">
+
+                        <span className="text-xs font-medium text-neutral-500 mb-1">Blended CAC</span>
+
+                        <span className="text-lg font-mono text-neutral-400 line-through decoration-neutral-600">
+                          ${blendedCac.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+
+                        </div>
+
+                        <div className="flex flex-col">
+
+                        <span className="text-xs font-semibold text-amber-400 mb-1">True Net-New CAC</span>
+
+                        <span className="text-2xl font-bold font-mono text-white">
+                          ${trueNetNewCac.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+
+                        </div>
+
+                        </div>
+
+                        </div>
+
+                        <p className="text-[9px] text-neutral-600 mt-2 leading-tight">Assuming 65% net-new customer acquisition.</p>
 
                         </div>
 
