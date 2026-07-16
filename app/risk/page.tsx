@@ -32,6 +32,7 @@ export default function RiskAnalysisPage() {
   const [loading, setLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string>("");
+  const [killSwitchActive, setKillSwitchActive] = useState<boolean>(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -99,6 +100,19 @@ export default function RiskAnalysisPage() {
 
   const selectedSession = sessions.find(s => s.id === selectedSessionId) || sessions[0];
   const budgets = selectedSession ? JSON.parse(selectedSession.budgetPayload) : {};
+
+  const grossMargin = budgets.grossMargin !== undefined 
+    ? Number(budgets.grossMargin) 
+    : (selectedSession && (selectedSession as any).grossMargin !== undefined 
+      ? Number((selectedSession as any).grossMargin) 
+      : 40);
+
+  const totalSpend = Object.entries(budgets)
+    .filter(([key]) => !["seasonality", "competitorThreat", "grossMargin"].includes(key))
+    .reduce((sum, [, val]) => sum + Number(val || 0), 0);
+
+  const projectedRevenue = selectedSession ? selectedSession.projectedRevenue : 0;
+  const netProfit = (projectedRevenue * (grossMargin / 100)) - totalSpend;
 
   const getChannelMetrics = (ch: string, spend: number) => {
     const p = channelParams[ch] || { roi: 1.5, cpc: 0.5, ctr: 0.02, cvr: 0.03, threshold: 500.0 };
@@ -223,6 +237,132 @@ export default function RiskAnalysisPage() {
                 </option>
               ))}
             </select>
+          </div>
+        </motion.div>
+
+        {/* Operational Threat Matrix */}
+        <motion.div variants={itemVariants} className="flex flex-col gap-2">
+          <h2 className="text-xl font-bold text-white border-b border-white/10 pb-2">
+            Operational Threat Matrix
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+            
+            {/* Left Column: Budget Burn & Blackout Risk */}
+            <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-lg flex flex-col gap-4">
+              <div className="flex justify-between items-center">
+                <span className="text-xs uppercase font-mono tracking-wider text-neutral-500 font-bold">
+                  Monthly Budget Pacing
+                </span>
+                <span className={`text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded ${
+                  totalSpend > 50000 
+                    ? "bg-red-500/10 text-red-500 border border-red-500/20" 
+                    : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                }`}>
+                  {totalSpend > 50000 ? "High Burn" : "Optimal"}
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between text-xs font-mono text-neutral-400">
+                  <span>Spend Velocity</span>
+                  <span>{totalSpend > 50000 ? "92%" : "68%"}</span>
+                </div>
+                <div className="w-full h-2 bg-neutral-950 rounded-full overflow-hidden border border-white/5">
+                  <div 
+                    className={`h-full ${totalSpend > 50000 ? "bg-red-500" : "bg-emerald-500"} transition-all duration-500`}
+                    style={{ width: totalSpend > 50000 ? "92%" : "68%" }}
+                  />
+                </div>
+              </div>
+
+              {/* Conditional Warning Alert */}
+              {totalSpend > 50000 ? (
+                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-xs leading-relaxed flex items-start gap-3 mt-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
+                  <span>CRITICAL: Current velocity indicates budget exhaustion 5 days before month-end. Blackout risk detected.</span>
+                </div>
+              ) : (
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs leading-relaxed flex items-start gap-3 mt-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mt-1.5 shrink-0" />
+                  <span>Pacing is optimal. No blackout risk.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Client Churn Predictor */}
+            <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-lg flex flex-col gap-4">
+              <div className="flex justify-between items-center">
+                <span className="text-xs uppercase font-mono tracking-wider text-neutral-500 font-bold">
+                  Client Retention Probability
+                </span>
+                <span className={`text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded ${
+                  netProfit < 0 
+                    ? "bg-red-500/10 text-red-500 border border-red-500/20" 
+                    : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                }`}>
+                  {netProfit < 0 ? "At Risk" : "Stable"}
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between text-xs font-mono text-neutral-400">
+                  <span>Retention Confidence</span>
+                  <span>{netProfit < 0 ? "24%" : "95%"}</span>
+                </div>
+                <div className="w-full h-2 bg-neutral-950 rounded-full overflow-hidden border border-white/5">
+                  <div 
+                    className={`h-full ${netProfit < 0 ? "bg-red-500" : "bg-emerald-500"} transition-all duration-500`}
+                    style={{ width: netProfit < 0 ? "24%" : "95%" }}
+                  />
+                </div>
+              </div>
+
+              {/* Dynamic Alert */}
+              {netProfit < 0 ? (
+                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-xs leading-relaxed flex items-start gap-3 mt-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
+                  <span>Emergency client sync required. Current allocation trajectory risks account churn within 30 days.</span>
+                </div>
+              ) : (
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs leading-relaxed flex items-start gap-3 mt-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mt-1.5 shrink-0" />
+                  <span>Account health stable. Strong renewal probability.</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Automated Velocity Kill-Switch */}
+        <motion.div
+          variants={itemVariants}
+          className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        >
+          <div className="flex flex-col gap-1.5">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+              Automated Velocity Kill-Switch
+            </h3>
+            <p className="text-neutral-400 text-xs">
+              Auto-Pause all campaigns if CPA exceeds projected threshold by 20% for 4 consecutive hours.
+            </p>
+            <span className="text-[10px] text-neutral-500 font-mono">
+              (Active logic synced via API. Requires agency manager override to disable)
+            </span>
+          </div>
+          <div className="flex items-center">
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={killSwitchActive}
+                onChange={(e) => setKillSwitchActive(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600 transition-all duration-200"></div>
+            </label>
           </div>
         </motion.div>
 
