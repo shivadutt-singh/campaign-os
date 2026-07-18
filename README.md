@@ -79,34 +79,57 @@ graph TD
 ```
 ---
 
-## 🚀 Quick Start (Automated Deployment)
+## 🚀 Quick Start (Deployment & Evaluation):
 
-We have provided a bulletproof `run.sh` script that provisions the clean environment, installs dependencies, handles Prisma migrations, and boots both the Next.js and Python servers simultaneously.
+To ensure strict compliance with the automated testing environment and simultaneously provide a seamless dashboard demo, our execution flow is split into two dedicated methods:
 
-### 1. Grant Execution Permissions
-*(Linux, macOS, or Git Bash on Windows)*
-```bash
-chmod +x run.sh
-```
-2. Execute the Isolated Script
+## 🧪 1. NetElixir Automated Evaluator Pipeline (Headless):
+
+This script is fully optimized for the automated grading system. It runs the prediction engine in complete isolation without booting servers or blocking the terminal.
+
+**Execution Command:**
+
 ```Bash
-./run.sh
+chmod +x run.sh
+./run.sh ./data ./pickle/model.pkl ./output/predictions.csv
 ```
+## Under the hood:
+
+Silently installs dependencies, parses CSVs, dynamically calculates deterministic predictions and true channel aggregations, writes to output/predictions.csv, and exits gracefully.
+
+🎨 2. The Agency Dashboard Demo (Full-Stack UI)
+To view the commercial SaaS interface and run the interactive features (Next.js & FastAPI), use the local startup script.
+
+**Execution Command:**
+
+```Bash
+chmod +x start_app.sh
+./start_app.sh
+```
+## Under the hood:
+
+Generates fallback environments, handles Prisma migrations, boots the Python FastAPI backend on port 8000, and starts the Next.js frontend on port 3000.
 ---
-- Generates a fallback .env with the SQLite database mapping.
-
-- Installs npm and pip dependencies in isolation.
-
-- Executes npx prisma migrate deploy to create the schema.
-
-- Boots the Python FastAPI backend on http://localhost:8000.
-
-- Builds and starts the Next.js frontend on http://localhost:3000.
-
-### Catches termination signals (SIGINT/SIGTERM) to gracefully kill background processes on exit.
----
-### 🌐 Accessing the Dashboard:
-#### Once the script completes the build process, open your browser and navigate to:
+🌐 Accessing the Dashboard:
+Once the start_app.sh script completes the build process, open your browser and navigate to:
 http://localhost:3000
---
+
+---
+
+## 👥 Team & Core Contributions
+
+* **[Shiv](https://github.com/shivadutt-singh) (Lead Architect & Full-Stack Engineer)** 
+  * Engineered the Deterministic Efficiency Apex Engine and core mathematical logic.
+  * Built the complete Next.js / FastAPI architecture and premium dark-mode UI.
+  * Designed and implemented the headless, zero-friction CI/CD evaluation pipeline (`run.sh`).
+
+* **[Vanshika](https://github.com/Vanshika-gupta001) (Product Manager & UI/UX Strategist)** 
+  * Designed the "Agency CFO" business narrative and core product positioning.
+  * Defined dashboard user flows and managed the pitch presentation strategy.
+
+* **[Shani](https://github.com/ShaniPratapSingh) (Data Engineer & Backend Support)** 
+  * Assisted with CSV data parsing and structuring the baseline data pipelines.
+  * Provided support for data formatting and integration testing for the math engine.
+
+---
 Built for scale. Engineered for precision. 🏆
